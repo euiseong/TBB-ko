@@ -1,5 +1,11 @@
 # Designing AI Serving Systems (at Cloud Scale)
 
+[![Build PDF](https://github.com/euiseong/TBB/actions/workflows/build-pdf.yml/badge.svg)](https://github.com/euiseong/TBB/actions/workflows/build-pdf.yml)
+[![Latest PDF](https://img.shields.io/badge/download-latest%20PDF-2563EB)](https://github.com/euiseong/TBB/releases/latest/download/main.pdf)
+ 
+**Download the book:** [latest PDF](https://github.com/euiseong/TBB/releases/latest/download/main.pdf) — 이 책의 최신 버전을 다운로드 받을 수 있습니다.
+ 
+
 AI 서비스 밑바탕의 원리 — 가상화, 컨테이너, 쿠버네티스, 서빙 엔진, 그리고 비용 —
 를 하나의 이야기로 엮은 오픈 교재입니다. 21시 04분에 무너진 데모에서 시작해,
 의도한 대로 정확히 월 900달러에 운영되는 서비스까지.
