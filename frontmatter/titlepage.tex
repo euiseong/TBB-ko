@@ -1,0 +1,46 @@
+%% Title page — palette bar, story descriptor,
+%% three-part foot line.
+\thispagestyle{empty}
+\begingroup
+\setlength{\parskip}{0pt}\raggedright
+
+% top strip: edition line over a hairline
+\noindent{\color{tbbgray}\large A Principles-First Textbook\hfill 한국어판 · 2026}\par
+\vspace{3pt}{\color{tbbtableborder}\rule{\linewidth}{0.4pt}}\par
+
+\vspace{2.6cm}
+
+% title
+{\titlefont\bfseries\fontsize{36}{40}\selectfont\color{tbbink}Designing AI Serving Systems\par}
+\vspace{6pt}
+{\titlefont\bfseries\fontsize{28}{32}\selectfont\color{tbbblue}(at Cloud Scale)\par}
+
+\vspace{16pt}
+% the five-colour palette bar (the figures' fixed palette, as a signature)
+\noindent\textcolor{tbbblue}{\rule{0.2\linewidth}{10pt}}%
+\textcolor{tbbteal}{\rule{0.2\linewidth}{10pt}}%
+\textcolor{tbbamber}{\rule{0.2\linewidth}{10pt}}%
+\textcolor{tbbpurple}{\rule{0.2\linewidth}{10pt}}%
+\textcolor{tbbred}{\rule{0.2\linewidth}{10pt}}\par
+
+\vspace{18pt}
+% descriptor
+{\fontsize{15}{21}\selectfont\color{tbbgray}%
+AI 서비스 밑바탕의 원리 --- 가상화, 컨테이너, 쿠버네티스, 서빙 엔진, 그리고 비용 --- 를 하나의 이야기로 엮었다. 21시 04분에 무너진 데모에서 시작해, 의도한 대로 정확히 월 900달러에 운영되는 서비스까지.\par}
+
+\vfill
+
+% author
+{\bfseries\fontsize{24}{28}\selectfont\color{tbbink}서의성\par}
+\vspace{4pt}
+{\fontsize{14}{18}\selectfont\color{tbbgray}성균관대학교 교수\par}
+
+\vspace{1.4cm}
+% foot: the three parts over a hairline
+{\color{tbbtableborder}\rule{\linewidth}{0.4pt}}\par\vspace{6pt}
+\noindent{\fontsize{12}{16}\selectfont%
+\textcolor{tbbblue}{\textbf{1부}} \textcolor{tbbgray}{인프라와 원리}\quad
+\textcolor{tbbteal}{\textbf{2부}} \textcolor{tbbgray}{AI 서빙 시스템}\quad
+\textcolor{tbbamber}{\textbf{3부}} \textcolor{tbbgray}{운영}\par}
+\endgroup
+\clearpage
