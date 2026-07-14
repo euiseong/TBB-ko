@@ -53,7 +53,7 @@ clf-6d9f4    996m         2913Mi
 \end{terminalbox}
 \figcaption{사례 9-A  정체 구간. 기꺼이 요청을 보내는 사용자 60명, 11.8 req/s, 5초 대기인데 GPU는 7\%에서 놀고 CPU 코어 하나만 포화한다. 고장 난 것은 없고 모두가 지나치게 정중할 뿐이다.}
 
-제7장의 도구로 부검해 보자. 사례의 모든 숫자는 한 가지 설계 사실에 의해 산술적으로 강제된다. \textbf{서버가 Python 스레드 하나에서 한 번에 요청 하나를 처음부터 끝까지 처리한다.} 요청마다 CPU에서 이미지 디코딩과 크기 조정에 \textasciitilde{}60 ms, 실제 GPU 추론에 \textasciitilde{}8 ms, 답 직렬화에 \textasciitilde{}15 ms를 쓴다. 직렬 작업이 \textasciitilde{}83 ms이므로 상한은 1 ÷ 0.083 ≈ \textbf{12 req/s}다. 사례 1-A의 계산이 세 번째 등장했다. 리틀의 법칙도 자백에 서명한다. 11.8 req/s로 동작하는 폐쇄 루프 사용자 60명은 각각 W = 60 ÷ 11.8 ≈ \textbf{5.1 s}를 기다려야 한다. 평균 열을 소수점까지 예측했다. GPU는 매초 11.8 × 8 ms ≈ \textbf{9\%}만 바쁘며 \code{nvidia-smi}가 이를 보여 준다. 고정된 코어 하나는 초당 11.8번 도착하는 60 ms 전처리를 담당한다. 제1장은 GPU를 수천 명의 작업자 부대라고 불렀다. 이 서버는 부대에 티스푼으로 일을 먹이면서 부대 가격을 낸다(그림 9-1).
+제7장의 도구로 부검해 보자. 사례의 모든 숫자는 한 가지 설계 사실에 의해 산술적으로 강제된다. \textbf{서버가 Python 스레드 하나에서 한 번에 요청 하나를 처음부터 끝까지 처리한다.} 요청마다 CPU에서 이미지 디코딩과 크기 조정에 \textasciitilde{}60 ms, 실제 GPU 추론에 \textasciitilde{}8 ms, 답 직렬화(serialization)에 \textasciitilde{}15 ms를 쓴다. 직렬 작업이 \textasciitilde{}83 ms이므로 상한은 1 ÷ 0.083 ≈ \textbf{12 req/s}다. 사례 1-A의 계산이 세 번째 등장했다. 리틀의 법칙도 자백에 서명한다. 11.8 req/s로 동작하는 폐쇄 루프 사용자 60명은 각각 W = 60 ÷ 11.8 ≈ \textbf{5.1 s}를 기다려야 한다. 평균 열을 소수점까지 예측했다. GPU는 매초 11.8 × 8 ms ≈ \textbf{9\%}만 바쁘며 \code{nvidia-smi}가 이를 보여 준다. 고정된 코어 하나는 초당 11.8번 도착하는 60 ms 전처리를 담당한다. 제1장은 GPU를 수천 명의 작업자 부대라고 불렀다. 이 서버는 부대에 티스푼으로 일을 먹이면서 부대 가격을 낸다(그림 9-1).
 
 \begin{tbbfigure}
   \adjustbox{max width=0.94\linewidth,max totalheight=0.46\textheight}{\includegraphics{figures/fig9-1_teaspoon.png}}\\[3pt]
@@ -98,7 +98,7 @@ f33c6b8  docs: "how our serving works" (34 pages)      (week 23)
   \arrayrulecolor{tbbtableborder}\hline
   {\textbf{서빙 프레임워크}} & {모델 서버의 여섯 기관(§9.2)을 유지 관리되는 형태로 구현한 것. Triton, TorchServe, BentoML, Ray Serve가 있다.} \\
   \arrayrulecolor{tbbtableborder}\hline
-  {\textbf{동적 배치 처리}} & {동시 요청을 서버에서 한 번의 GPU 실행으로 모으는 방식. 최대 배치 크기와 최대 대기열 지연으로 제한한다(§9.3).} \\
+  {\textbf{동적 배치(dynamic batching) 처리}} & {동시 요청을 서버에서 한 번의 GPU 실행으로 모으는 방식. 최대 배치 크기와 최대 대기열 지연으로 제한한다(§9.3).} \\
   \arrayrulecolor{tbbtableborder}\hline
   {\textbf{인스턴스 그룹}} & {GPU 하나 또는 여러 GPU에서 실행되는 모델 복사본 N개. 계산과 전처리/후처리를 겹치게 한다. Triton의 명칭이며 모든 프레임워크에 대응 요소가 있다.} \\
   \arrayrulecolor{tbbtableborder}\hline
@@ -106,9 +106,9 @@ f33c6b8  docs: "how our serving works" (34 pages)      (week 23)
   \arrayrulecolor{tbbtableborder}\hline
   {\textbf{핸들러}} & {프레임워크가 모델 앞뒤에서 실행하는 사용자 코드(전처리/후처리). TorchServe의 용어이며 BentoML과 Ray는 일반 Python으로 표현한다.} \\
   \arrayrulecolor{tbbtableborder}\hline
-  {\textbf{앙상블/그래프}} & {클라이언트 왕복 없이 실행하는 모델과 단계의 서버 측 파이프라인(전처리 → 모델 → 후처리).} \\
+  {\textbf{앙상블(ensemble)/그래프}} & {클라이언트 왕복 없이 실행하는 모델과 단계의 서버 측 파이프라인(전처리 → 모델 → 후처리).} \\
   \arrayrulecolor{tbbtableborder}\hline
-  {\textbf{유효 처리량}} & {SLO 안에서 성공한 요청만 세는 처리량. 시간 초과와 오류가 표를 채울 때 중요한 숫자다(§9.5).} \\
+  {\textbf{유효 처리량(goodput)}} & {SLO 안에서 성공한 요청만 세는 처리량. 시간 초과와 오류가 표를 채울 때 중요한 숫자다(§9.5).} \\
   \arrayrulecolor{tbbtableborder}\hline
   {\textbf{개방 루프 페이싱}} & {응답과 무관하게 고정 도착률로 부하를 생성하는 방식(Locust의 constant\_throughput). §7.3의 정직성 요구를 구현한다.} \\
   \arrayrulecolor{tbbtableborder}\hline
@@ -138,7 +138,7 @@ f33c6b8  docs: "how our serving works" (34 pages)      (week 23)
 
 \subsection*{① 프런트엔드: 프로토콜, 검증, 출입구 정책}
 
-프런트엔드는 제6장 게이트웨이의 공용어인 HTTP를 사용하고, 진지한 배포에서는 초당 요청량이 많은 내부 호출자를 위해 \textbf{gRPC}도 사용한다. gRPC의 이점은 구체적이다. 이미지나 텐서는 base64로 부풀린 JSON(+33\% 바이트와 두 번의 디코딩 단계)이 아니라 압축된 이진 프레임의 원시 바이트로 이동하고, 하나의 다중화 연결이 계속 반복되는 HTTP 핸드셰이크를 대신한다. 작은 텐서를 1,000 req/s로 보낼 때 직렬화 비용은 지연 시간 예산에서 눈에 보이는 몫이지만 큰 이미지를 10 req/s로 보낼 때는 차이를 알아채기 어렵다. 프런트엔드는 출입구 정책도 강제한다. \textbf{GPU 전에 검증}해야 한다. 잘못된 이미지는 배치 자리를 소비한 뒤 CUDA 커널 깊은 곳에서 500 오류로 죽는 대신 몇 마이크로초 안에 출입구에서 400 오류로 거부되어야 한다. 방식이 요구하면 스트리밍 응답도 구현한다(§7.2). 그래서 "프록시 체인이 서버 전송 이벤트를 버퍼링 없이 전달할 수 있는가?"가 제6장의 질문이었다.
+프런트엔드는 제6장 게이트웨이의 공용어인 HTTP를 사용하고, 진지한 배포에서는 초당 요청량이 많은 내부 호출자를 위해 \textbf{gRPC}도 사용한다. gRPC의 이점은 구체적이다. 이미지나 텐서는 base64로 부풀린 JSON(+33\% 바이트와 두 번의 디코딩 단계)이 아니라 압축된 이진 프레임의 원시 바이트로 이동하고, 하나의 다중화(multiplexing) 연결이 계속 반복되는 HTTP 핸드셰이크를 대신한다. 작은 텐서를 1,000 req/s로 보낼 때 직렬화 비용은 지연 시간 예산에서 눈에 보이는 몫이지만 큰 이미지를 10 req/s로 보낼 때는 차이를 알아채기 어렵다. 프런트엔드는 출입구 정책도 강제한다. \textbf{GPU 전에 검증}해야 한다. 잘못된 이미지는 배치 자리를 소비한 뒤 CUDA 커널 깊은 곳에서 500 오류로 죽는 대신 몇 마이크로초 안에 출입구에서 400 오류로 거부되어야 한다. 방식이 요구하면 스트리밍 응답도 구현한다(§7.2). 그래서 "프록시 체인이 서버 전송 이벤트(server-sent events)를 버퍼링 없이 전달할 수 있는가?"가 제6장의 질문이었다.
 
 \subsection*{② ③ 대기열, 배처, 인스턴스: 성능 기관}
 
@@ -229,7 +229,7 @@ instance_group [ { count: 2, kind: KIND_GPU } ]   # organ ③: pipelining
 {\normalsize\bfseries\color{tbbx115E59}상자 9-1  배치 처리 이야기가 이어지는 곳}\par\vspace{3pt}
 \textbf{이 장:} 이미지 분류기, 임베딩 모델, 랭커처럼 독립적이고 형태가 비슷한 요청의 동적 배치 처리를 다룬다. 요청 하나가 단위 하나이며 배치 처리는 투명하다.
 
-\textbf{11주 차:} LLM 생성은 "형태가 비슷하다"는 가정을 치명적으로 깨뜨린다. 시퀀스마다 길이와 종료 시점이 다르므로 고전 동적 배치 처리는 가장 긴 시퀀스를 기다리며 GPU 절반을 비운다. 해결책인 토큰마다 배치에 들어오고 나가는 \textbf{연속 배치 처리}와 이를 가능하게 하는 KV 캐시가 vLLM의 존재 이유다. 그림 9-4에서 일반 프레임워크 지도 밖에 둔 이유이기도 하다.
+\textbf{11주 차:} LLM 생성은 "형태가 비슷하다"는 가정을 치명적으로 깨뜨린다. 시퀀스마다 길이와 종료 시점이 다르므로 고전 동적 배치 처리는 가장 긴 시퀀스를 기다리며 GPU 절반을 비운다. 해결책인 토큰마다 배치에 들어오고 나가는 \textbf{연속 배치(continuous batching) 처리}와 이를 가능하게 하는 KV 캐시가 vLLM의 존재 이유다. 그림 9-4에서 일반 프레임워크 지도 밖에 둔 이유이기도 하다.
 \end{calloutbox}
 
 \vspace{3.0pt}
@@ -449,7 +449,7 @@ $ locust -f locustfile.py --headless -u 120 -r 20 --run-time 4m ...
   \item \textbf{④ 기준선 스윕, 배치 처리 끄기.} \code{dynamic\_batching}이 없는 \code{config.pbtxt}, 터미널 기록 9-5의 locustfile로 다섯 단계를 실행해 표로 만든다. 변곡점에서 GPU 사용률을 기록한다. 사례 9-A 근처를 예상한다.
   \item \textbf{⑤ 배치 처리 켜기.} 터미널 기록 9-2의 여섯 줄을 추가하고 다시 스윕한다. 같은 실리콘과 새 표로 자기만의 그림 9-1을 만든다. 두 실행 모두 \code{nvidia-smi dmon}을 화면 캡처한다.
   \item \textbf{⑥ 설정값 하나 실험.} \code{instance\_group count: 1 → 2}로 바꾸고 한 번 다시 스윕한다. 배치 처리는 GPU 비용을 분산하고 인스턴스는 전처리/후처리를 계산과 겹친다(§9.2 기관 ③). \textit{이} 모델에서는 무엇이 더 중요했는지 설명한다.
-  \item \textbf{⑦ 재시도 폭풍(§9.5).} 세 번 재시도/백오프 없음으로 변곡점의 1.1×에서 120초 실행하고 도착 요청 대 유효 처리량을 화면 캡처한다. 이어 재시도 예산을 적용한다. 시간 초과 재시도 제거, 지터를 적용한 백오프, Triton의 \code{max\_queue\_size} + \code{default\_timeout}을 통한 대기열 깊이 기반 부하 차단을 적용해 버스트를 반복하고 복구를 화면 캡처한다.
+  \item \textbf{⑦ 재시도 폭풍(§9.5).} 세 번 재시도/백오프 없음으로 변곡점의 1.1×에서 120초 실행하고 도착 요청 대 유효 처리량을 화면 캡처한다. 이어 재시도 예산을 적용한다. 시간 초과 재시도 제거, 지터를 적용한 백오프, Triton의 \code{max\_queue\_size} + \code{default\_timeout}을 통한 대기열 깊이 기반 부하 차단(load shedding)을 적용해 버스트를 반복하고 복구를 화면 캡처한다.
   \item \textbf{⑧ 제안서 갱신.} §7.7에서 추정한 레플리카별 요청률을 ⑤에서 측정한 숫자로 바꾼다. 플릿 규모와 월 청구서를 다시 계산한다(제2장 표). 숫자가 크게 움직였다면 보통 그렇듯 이유를 한 문장으로 밝힌다.
 \end{tbbitemize}
 
@@ -641,7 +641,7 @@ $ locust -f locustfile.py --headless -u 120 -r 20 --run-time 4m ...
   \item \textbf{[이번 주] C. Olston 외, "TensorFlow-Serving: Flexible, High-Performance ML Serving"(2017)} — 사례 9-B의 결론을 뒷받침하는 논문이다. Google의 기관을 처음 키운 사람들이 직접 그 구조를 설명한다. 짧고 읽기 쉬우니 여섯 기관을 모두 찾아보자.
   \item \textbf{BentoML과 Ray Serve 문서(아키텍처 + 배치 처리 페이지)} — 그림 9-4에서 코드 우선 쪽 절반을 원자료로 확인할 수 있다. Ray Serve의 "resource allocation" 페이지는 분할 GPU를 §2.6에서 요구한 수준으로 솔직하게 다룬다.
   \item *\textit{M. Nygard, }Release It!\textit{(2판, 2018)의 안정성 패턴 장}* — 재시도 폭풍, 격벽, 부하 차단을 시대를 타지 않는 패턴으로 설명한다. §9.5의 폭풍은 그가 말한 "self-denial attack"이 ML 옷을 입은 모습이다.
-  \item \textbf{[10주 차] ONNX Runtime + TensorRT 실행 공급자 문서} — 다음 주에는 같은 실습 서버의 백엔드를 바꾸고 스윕을 다시 실행한다. 재현 가능한 스윕을 만든 이유가 바로 여기에 있다.
+  \item \textbf{[10주 차] ONNX Runtime + TensorRT 실행 공급자(execution provider) 문서} — 다음 주에는 같은 실습 서버의 백엔드를 바꾸고 스윕을 다시 실행한다. 재현 가능한 스윕을 만든 이유가 바로 여기에 있다.
   \item \textbf{[11주 차] Yu 외, "Orca: A Distributed Serving System for Transformer-Based Generative Models"(OSDI 2022)} — 상자 9-1의 가정이 깨지는 이유와 vLLM이 필요한 이유를 설명한 연속 배치 처리 논문이다. KV 캐시 강의 뒤에 읽자.
   \item \textbf{[12주 차] KServe 문서(InferenceService)} — 이번 주 Triton 파드가 오토스케일링과 카나리를 갖춘 플랫폼 구성원이 되는 과정을 보여 준다. 지금은 CRD를 훑고 12주 차에 직접 배포한다.
 \end{tbbitemize}

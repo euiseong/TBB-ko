@@ -164,7 +164,7 @@ Unix는 PID 1(init)에 대부분의 애플리케이션 코드가 생각해 본 �
 
 \subsection*{NET: 비공개 스택과 요청 하나의 생애}
 
-NET 네임스페이스는 여섯 개 중 가장 물리적으로 느껴진다. 컨테이너가 인터페이스, IP 주소, 라우팅 테이블, 방화벽 규칙, 그리고 무엇보다 \textbf{자체 포트 공간}을 포함한 완전한 비공개 네트워크 스택을 얻는다. 호스트 하나의 모델 서버 레플리카 20개가 충돌 없이 모두 \code{:8000}에 바인딩할 수 있다. 이 덕분에 레플리카 서버군을 관리할 수 있다. 1998년처럼 포트를 하나씩 배정할 필요가 없다.
+NET 네임스페이스는 여섯 개 중 가장 물리적으로 느껴진다. 컨테이너가 인터페이스, IP 주소, 라우팅 테이블(routing table), 방화벽 규칙, 그리고 무엇보다 \textbf{자체 포트 공간}을 포함한 완전한 비공개 네트워크 스택을 얻는다. 호스트 하나의 모델 서버 레플리카 20개가 충돌 없이 모두 \code{:8000}에 바인딩할 수 있다. 이 덕분에 레플리카 서버군을 관리할 수 있다. 1998년처럼 포트를 하나씩 배정할 필요가 없다.
 
 새 비공개 스택은 새로 \textit{연결이 끊긴} 스택이기도 하다. 새 NET 네임스페이스에는 루프백 장치만 있고 그마저 내려가 있다. 표준 배선(그림 3-3 오른쪽)은 패치 케이블처럼 연결한 가상 NIC 두 개, 즉 \textbf{veth 쌍}을 만든다. 제2장의 virtio 정신을 네트워킹에 적용한 것이다. 한쪽 끝은 컨테이너 안에 두고 \code{eth0}으로 이름을 바꾸며, 다른 끝은 호스트의 소프트웨어 \textbf{브리지}(Docker의 \code{docker0})에 연결한다. 구체적으로 \code{-p 8080:8000}으로 공개한 8000번 포트의 컨테이너까지 노트북의 요청 하나를 추적해 보자.
 
@@ -175,11 +175,11 @@ NET 네임스페이스는 여섯 개 중 가장 물리적으로 느껴진다. �
   \item \textbf{반환:} 응답은 경로를 거슬러 간다. 연결 추적이 소스의 NAT를 되돌리므로 노트북은 아무것도 모른 채 \code{host:8080}의 응답을 본다.
 \end{tbbitemize}
 
-5주 차를 위해 미리 기록해 둘 내용이 있다. Kubernetes \textbf{pod}는 하나의 NET 네임스페이스를 소유하는 작은 "pause" 자리 표시자 프로세스를 통해 \textbf{NET 네임스페이스 하나를 공유하는} 컨테이너로 정의된다. 이 한 가지 설계 결정 때문에 사이드카 프록시가 \code{localhost}로 모델 서버에 도달하고, "pod당 IP 하나"가 가능하며, pod 안의 컨테이너 둘은 포트가 충돌할 \textit{수 있지만} pod 둘은 충돌하지 않는다.
+5주 차를 위해 미리 기록해 둘 내용이 있다. Kubernetes \textbf{pod}는 하나의 NET 네임스페이스를 소유하는 작은 "pause" 자리 표시자 프로세스를 통해 \textbf{NET 네임스페이스 하나를 공유하는} 컨테이너로 정의된다. 이 한 가지 설계 결정 때문에 사이드카(sidecar) 프록시가 \code{localhost}로 모델 서버에 도달하고, "pod당 IP 하나"가 가능하며, pod 안의 컨테이너 둘은 포트가 충돌할 \textit{수 있지만} pod 둘은 충돌하지 않는다.
 
 \subsection*{USER: 내부의 root는 외부의 root가 아니다}
 
-USER 네임스페이스는 명시적인 테이블 \code{/\allowbreak proc/\allowbreak <pid>/\allowbreak uid\_map}으로 사용자 ID를 다시 매핑한다. \code{0 100000 65536}이라는 매핑은 "이 네임스페이스 내부의 uid 0이 외부의 uid 100000에 대응하며 65536개 ID 범위에 적용된다"는 뜻이다. 따라서 프로세스는 내부에서 비공개 파일 시스템에 패키지를 설치하고 비공개 80번 포트에 바인딩하는 \textit{root}이면서, 호스트 커널에는 특권 없는 uid 100000일 수 있다. 내부에서 파일을 만들면 호스트에서는 특별할 것 없는 100000이 소유한다. 이것이 \textbf{루트리스 컨테이너}(Podman의 대표 기능, Docker의 루트리스 모드)의 기반이다. 런타임까지 특권 없이 실행하여 컨테이너 탈출의 결과를 크게 줄인다. 루트리스 컨테이너를 탈출한 공격자는 호스트에서 아무 권한 없는 사용자로 나온다. (완화책일 뿐 제2장의 microVM 경계는 아니다. 공유 커널의 시스템 호출 표면이 남아 있다.)
+USER 네임스페이스는 명시적인 테이블 \code{/\allowbreak proc/\allowbreak <pid>/\allowbreak uid\_map}으로 사용자 ID를 다시 매핑한다. \code{0 100000 65536}이라는 매핑은 "이 네임스페이스 내부의 uid 0이 외부의 uid 100000에 대응하며 65536개 ID 범위에 적용된다"는 뜻이다. 따라서 프로세스는 내부에서 비공개 파일 시스템에 패키지를 설치하고 비공개 80번 포트에 바인딩하는 \textit{root}이면서, 호스트 커널에는 특권 없는 uid 100000일 수 있다. 내부에서 파일을 만들면 호스트에서는 특별할 것 없는 100000이 소유한다. 이것이 \textbf{루트리스 컨테이너(rootless container)}(Podman의 대표 기능, Docker의 루트리스 모드)의 기반이다. 런타임까지 특권 없이 실행하여 컨테이너 탈출의 결과를 크게 줄인다. 루트리스 컨테이너를 탈출한 공격자는 호스트에서 아무 권한 없는 사용자로 나온다. (완화책일 뿐 제2장의 microVM 경계는 아니다. 공유 커널의 시스템 호출 표면이 남아 있다.)
 
 \subsection*{UTS와 IPC: 짧지만 가볍지 않게}
 
@@ -196,7 +196,7 @@ UTS(자체 호스트 이름)는 가장 작은 네임스페이스이자 최고의
 
 \section{cgroups v2: 머신의 제한된 몫}
 
-네임스페이스는 프로세스에 보이는 것을 바꾸지만 소비할 수 있는 양은 제한하지 않는다. 아름답게 비공개인 PID 트리를 가진 컨테이너화 모델 서버도 노드의 모든 코어와 RAM을 마지막 바이트까지 먹어 치우고 이웃 레플리카 19개를 함께 쓰러뜨릴 수 있다. 두 번째 재료인 \textbf{컨트롤 그룹, cgroups v2}는 예산 시스템이다. 프로세스를 그룹에 넣고 그룹별 \textbf{컨트롤러}가 CPU, 메모리, I/O, 프로세스 수를 계량하고 제한한다. 네임스페이스가 "어떤 세계가 보이는가?"에 답한다면 cgroup은 "머신을 얼마만큼 사용할 수 있는가?"에 답한다(그림 3-4).
+네임스페이스는 프로세스에 보이는 것을 바꾸지만 소비할 수 있는 양은 제한하지 않는다. 아름답게 비공개인 PID 트리를 가진 컨테이너화(containerization) 모델 서버도 노드의 모든 코어와 RAM을 마지막 바이트까지 먹어 치우고 이웃 레플리카 19개를 함께 쓰러뜨릴 수 있다. 두 번째 재료인 \textbf{컨트롤 그룹, cgroups v2}는 예산 시스템이다. 프로세스를 그룹에 넣고 그룹별 \textbf{컨트롤러}가 CPU, 메모리, I/O, 프로세스 수를 계량하고 제한한다. 네임스페이스가 "어떤 세계가 보이는가?"에 답한다면 cgroup은 "머신을 얼마만큼 사용할 수 있는가?"에 답한다(그림 3-4).
 
 \begin{tbbfigure}
   \adjustbox{max width=0.94\linewidth,max totalheight=0.46\textheight}{\includegraphics{figures/fig3-4_cgroups.png}}\\[3pt]
@@ -237,15 +237,15 @@ nr_throttled 0                                # (watch this one in a moment)
   \arrayrulecolor{tbbtableborder}\hline
   {\textbf{cpu.weight}} & {경합 시 비례 몫(1–10000), 소프트하고 남는 자원을 활용함} & {kubelet(요청량에서 계산)} \\
   \arrayrulecolor{tbbtableborder}\hline
-  {\textbf{cpu.stat}} & {사용량 + nr\_throttled / throttled\_usec — 스로틀링 진단} & {(읽기 전용 텔레메트리)} \\
+  {\textbf{cpu.stat}} & {사용량 + nr\_throttled / throttled\_usec — 스로틀링(throttling) 진단} & {(읽기 전용 텔레메트리)} \\
   \arrayrulecolor{tbbtableborder}\hline
-  {\textbf{memory.max}} & {단단한 메모리 벽, 회수 실패 후 초과 → OOM 강제 종료} & {docker -m, kubelet(한도)} \\
+  {\textbf{memory.max}} & {단단한 메모리 벽(memory wall), 회수 실패 후 초과 → OOM 강제 종료} & {docker -m, kubelet(한도)} \\
   \arrayrulecolor{tbbtableborder}\hline
   {\textbf{memory.high}} & {소프트 상한: 스로틀링 + 회수, 강제 종료 없음 — 경보선(§3.6)} & {사용자 / 플랫폼 정책} \\
   \arrayrulecolor{tbbtableborder}\hline
   {\textbf{memory.current}} & {그룹의 실시간 사용량 — 실습에서 관찰} & {(읽기 전용 텔레메트리)} \\
   \arrayrulecolor{tbbtableborder}\hline
-  {\textbf{memory.events}} & {oom\_kill을 포함한 카운터 — OOM 증거 장부} & {(읽기 전용 텔레메트리)} \\
+  {\textbf{memory.events}} & {oom\_kill을 포함한 카운터(counter) — OOM 증거 장부} & {(읽기 전용 텔레메트리)} \\
   \arrayrulecolor{tbbtableborder}\hline
   {\textbf{pids.max}} & {최대 프로세스/스레드 수 — 포크 폭탄 울타리} & {docker --pids-limit} \\
   \arrayrulecolor{tbbnavy}\specialrule{1pt}{2pt}{0pt}
@@ -275,7 +275,7 @@ throttled_usec 8221340    # 8.2 s of enforced pause, total
 
 \subsection*{메모리: 집행자가 지키는 단단한 벽 — 메모리 회수의 미묘함}
 
-메모리 컨트롤러의 \code{memory.max}는 진정한 하드 한도지만, 벽에 이르는 길에는 단순한 그림이 놓치는 정거장이 있다. \textbf{메모리 회수}다. 그룹 사용량이 한도에 도달하면 커널은 먼저 다시 만들 수 있는 메모리를 해제하려 한다. 대표적으로 RAM에 캐시한 파일 내용인 \textbf{페이지 캐시}가 있다. 대시보드를 읽을 때 중요하다. \code{memory.current}는 페이지 캐시를 포함하므로, 대형 파일을 스트리밍하는 컨테이너(예: 모델 가중치 로딩)가 몇 시간 동안 한도에 붙어 있는 \textit{것처럼 보여도} 완벽하게 건강할 수 있다. 캐시는 회수 가능한 짐이지 필수 메모리가 아니다. 회수할 수 없는 것은 Python 힙과 텐서 같은 \textbf{익명 메모리}다. 벽에 닿은 사용량이 익명 메모리라면 회수에 실패하고, 커널은 \textbf{이 cgroup 범위의 OOM 킬러}를 호출한다. 그룹에서 가장 큰 프로세스(\code{oom\_score\_adj}로 조정 가능)를 골라 항소할 수도 잡을 수도 없고 피해자에게 보이지도 않는 SIGKILL을 보낸다. 애플리케이션 로그에는 아무것도 없고 셸에는 \textbf{종료 코드 137}(128 + 9)이 보이며 Kubernetes는 \code{OOMKilled}를 찍는다. 더 온화한 형제인 \code{memory.high}는 죽이지 \textit{않고} 스로틀링하고 공격적으로 회수한다. 3.6절에서 설정할 경보선이며, 이후 전체 이야기를 그 절이 맡는다.
+메모리 컨트롤러의 \code{memory.max}는 진정한 하드 한도지만, 벽에 이르는 길에는 단순한 그림이 놓치는 정거장이 있다. \textbf{메모리 회수}다. 그룹 사용량이 한도에 도달하면 커널은 먼저 다시 만들 수 있는 메모리를 해제하려 한다. 대표적으로 RAM에 캐시한 파일 내용인 \textbf{페이지 캐시(page cache)}가 있다. 대시보드를 읽을 때 중요하다. \code{memory.current}는 페이지 캐시를 포함하므로, 대형 파일을 스트리밍하는 컨테이너(예: 모델 가중치 로딩)가 몇 시간 동안 한도에 붙어 있는 \textit{것처럼 보여도} 완벽하게 건강할 수 있다. 캐시는 회수 가능한 짐이지 필수 메모리가 아니다. 회수할 수 없는 것은 Python 힙과 텐서 같은 \textbf{익명 메모리}다. 벽에 닿은 사용량이 익명 메모리라면 회수에 실패하고, 커널은 \textbf{이 cgroup 범위의 OOM 킬러}를 호출한다. 그룹에서 가장 큰 프로세스(\code{oom\_score\_adj}로 조정 가능)를 골라 항소할 수도 잡을 수도 없고 피해자에게 보이지도 않는 SIGKILL을 보낸다. 애플리케이션 로그에는 아무것도 없고 셸에는 \textbf{종료 코드 137}(128 + 9)이 보이며 Kubernetes는 \code{OOMKilled}를 찍는다. 더 온화한 형제인 \code{memory.high}는 죽이지 \textit{않고} 스로틀링하고 공격적으로 회수한다. 3.6절에서 설정할 경보선이며, 이후 전체 이야기를 그 절이 맡는다.
 
 \subsection*{cgroup이 중재할 수 있는 것과 없는 것}
 
@@ -604,7 +604,7 @@ $ echo $?
 
 \qitem{2}{\textbf{네임스페이스는 머신이 아니라 관점을 비공개로 만든다.} PID, NET, MNT, UTS, IPC, USER와 cgroup, 시간 네임스페이스가 있다. API는 unshare/clone/setns이며, \code{docker exec}는 긴 외투를 입은 setns일 뿐이다.}
 
-\qitem{3}{\textbf{PID 1은 직무다.} 고아를 회수하고 신호를 처리해야 한다. 그렇지 않으면 롤아웃에서 SIGTERM이 무시되고 끝내 SIGKILL을 받는다. 서버에서 SIGTERM을 처리하거나 tini를 실행해야 한다. 이 한 문단이 실제 사고를 막는다.}
+\qitem{3}{\textbf{PID 1은 직무다.} 고아를 회수하고 신호를 처리해야 한다. 그렇지 않으면 롤아웃(rollout)에서 SIGTERM이 무시되고 끝내 SIGKILL을 받는다. 서버에서 SIGTERM을 처리하거나 tini를 실행해야 한다. 이 한 문단이 실제 사고를 막는다.}
 
 \qitem{4}{\textbf{NET 네임스페이스는 모든 컨테이너에 자체 포트 공간을 제공}하고, veth 쌍과 NAT를 통해 호스트 브리지에 연결한다. Kubernetes pod는 NET 네임스페이스 하나를 공유하는 컨테이너다. 그래서 localhost 사이드카와 pod당 IP 하나가 가능하다(5주 차).}
 
@@ -664,7 +664,7 @@ $ echo $?
 
 \begin{tbboptions}
   \item ① \textasciitilde{}8 GB — 컨테이너마다 이미지를 복사한다
-  \item ② \textasciitilde{}4 GB — 쓰기 시 복사가 절반으로 줄인다
+  \item ② \textasciitilde{}4 GB — 쓰기 시 복사(copy-on-write)가 절반으로 줄인다
   \item ③ \textasciitilde{}0 — 계층은 읽기 전용으로 공유하며 컨테이너마다 얇은 쓰기 가능 upper 디렉터리만 추가한다
   \item ④ memory.max에 따라 다르다
 \end{tbboptions}
