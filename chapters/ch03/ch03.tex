@@ -74,10 +74,10 @@ $ ls -l /proc/41320/ns/pid                         # and its private view
 
 \subsection*{신비를 벗기는 일이 중요한 이유(철학적인 이유만은 아니다)}
 
-제2장의 격리 스펙트럼에서 이미 이 사실을 한 번 사용했다. 컨테이너가 호스트 커널을 공유하므로 멀티테넌트 플랫폼은 gVisor나 microVM을 선택한다. 그러나 레시피 관점은 이 과정의 매주 운영에서 보상을 준다.
+제2장의 격리 스펙트럼에서 이미 이 사실을 한 번 사용했다. 컨테이너가 호스트 커널을 공유하므로 멀티테넌트 플랫폼은 gVisor나 microVM을 선택한다. 그러나 레시피 관점은 이 책의 매주 운영에서 보상을 준다.
 
 \begin{tbbitemize}
-  \item \textbf{이 과정의 나머지 동안 모델 서버는 컨테이너다.} 4주 차에는 이미지로 패키징하고, 5주 차에는 Kubernetes가 스케줄링하며, 9\textasciitilde{}12주 차에는 그 안에서 서빙한다. 자원 한도, 상태 검사, 네트워킹, GPU 접근 등 시스템이 컨테이너에 하는 모든 일의 바닥에는 이 장의 세 메커니즘이 있다. 오작동하면 이 계층에서 디버깅한다.
+  \item \textbf{이 책의 나머지 동안 모델 서버는 컨테이너다.} 4주 차에는 이미지로 패키징하고, 5주 차에는 Kubernetes가 스케줄링하며, 9\textasciitilde{}12주 차에는 그 안에서 서빙한다. 자원 한도, 상태 검사, 네트워킹, GPU 접근 등 시스템이 컨테이너에 하는 모든 일의 바닥에는 이 장의 세 메커니즘이 있다. 오작동하면 이 계층에서 디버깅한다.
   \item \textbf{실전에서 가장 흔한 서빙 장애가 이 장의 결말이다.} \code{OOMKilled}, 종료 코드 137과 함께 애플리케이션 로그 없이 죽는 추론 pod도 memory.max가 cgroup 파일이고 OOM 킬러가 이를 강제한다는 사실을 알면 수수께끼가 아니다. 3.6절은 언젠가 오전 2시에 읽게 될 실제 \code{dmesg} 줄과 \code{kubectl} 출력을 통해 이 사고를 체크리스트로 바꾼다.
   \item \textbf{이미지 계층은 지연 시간 예산이다.} PyTorch/CUDA 이미지는 5–10 GB에 이른다. 새 노드로 이미지를 가져오는 시간이 12주 차 콜드 스타트 청구서에서 가장 큰 단일 항목일 때가 많다. \code{RUN rm}을 실행해도 아무것도 작아지지 않는 이유를 포함해 overlayfs(3.4절)를 이해하면 이미지 축소가 맹목적인 관습이 아니라 합리적인 작업이 된다.
   \item \textbf{디버깅의 성격이 바뀐다.} 컨테이너가 프로세스라는 사실을 알면 기록 3-1의 도구 상자를 어디서든 사용할 수 있다. \code{ps}, \code{/\allowbreak proc/\allowbreak <pid>/\allowbreak ns}, cgroup 파일, 내부로 들어가는 \code{nsenter}다. 상자가 더는 불투명하지 않고, "컨테이너에서는 작동합니다"가 대화의 끝이 아니게 된다.
@@ -224,7 +224,7 @@ nr_throttled 0                                # (watch this one in a moment)
 \end{terminalbox}
 \figcaption{기록 3-4  다섯 번의 파일 작업으로 만든 완전한 cgroup 예산. mkdir, 한도를 쓰는 echo 두 번, 등록하는 echo 한 번, 관찰하는 cat이다. Docker와 kubelet이 사용자를 대신해 정확히 이 일을 한다.}
 
-\code{mkdir}, \code{echo}, \code{cat}이 메커니즘의 전부다. 대필자를 알아보자(아래 표 3-2). Docker 플래그나 Kubernetes 한도는 결국 프로그램이 이 파일에 숫자를 쓰는 것이다. v2의 단일 트리는 v1의 컨트롤러별로 뒤얽힌 계층을 대체했다. 현대 배포판과 Kubernetes는 v2를 기본으로 사용하며 이 과정도 줄곧 v2를 다룬다.
+\code{mkdir}, \code{echo}, \code{cat}이 메커니즘의 전부다. 대필자를 알아보자(아래 표 3-2). Docker 플래그나 Kubernetes 한도는 결국 프로그램이 이 파일에 숫자를 쓰는 것이다. v2의 단일 트리는 v1의 컨트롤러별로 뒤얽힌 계층을 대체했다. 현대 배포판과 Kubernetes는 v2를 기본으로 사용하며 이 책도 줄곧 v2를 다룬다.
 
 \begin{tbbtablewrap}
   \begin{tabular}{@{}>{\raggedright\arraybackslash}m{\dimexpr 0.2447\tbltextwidth-2\tabcolsep\relax} >{\raggedright\arraybackslash}m{\dimexpr 0.4574\tbltextwidth-2\tabcolsep\relax} >{\raggedright\arraybackslash}m{\dimexpr 0.2979\tbltextwidth-2\tabcolsep\relax}@{}}
@@ -279,7 +279,7 @@ throttled_usec 8221340    # 8.2 s of enforced pause, total
 
 \subsection*{cgroup이 중재할 수 있는 것과 없는 것}
 
-나머지 컨트롤러도 살펴보자. \code{io}는 블록 장치 대역폭과 IOPS를 계량하며, 가중치 로딩이 공유 디스크를 두들길 때 중요하다. \code{pids}는 프로세스 수를 제한하는 Liz Rice 시연의 포크 폭탄 울타리다. \code{cpuset}은 그룹을 특정 코어에 고정하며, 제2장 전용 코어 인스턴스의 컨테이너 사촌이다. 이 과정의 방향을 결정하므로 빈 공간에도 주목해야 한다. \textbf{cgroup에는 GPU 컨트롤러가 없다.} 커널은 \code{/\allowbreak dev/\allowbreak nvidia*} 장치에 대한 \textit{접근}을 통제할 수 있으며, 권한 수준에서 \code{--gpus}가 작동하는 방식이다. 4주 차에 도구의 배관을 보여 준다. 그러나 cgroup 트리에는 \code{cpu.max}와 \code{memory.max}처럼 GPU 계산 시간을 나누거나 VRAM을 분할하는 것이 없다. 구체적으로 GPU 하나에 프로세스 둘을 놓으면 어느 쪽이든 VRAM 전체를 \code{cudaMalloc}하거나 SM을 독점할 수 있다. 이 부재 때문에 GPU 공유에는 제2장의 공급자 메커니즘인 시간 분할, MPS, MIG가 필요하며 12주 차 GPU 공유 도구 상자는 이 절과 전혀 다르게 생겼다.
+나머지 컨트롤러도 살펴보자. \code{io}는 블록 장치 대역폭과 IOPS를 계량하며, 가중치 로딩이 공유 디스크를 두들길 때 중요하다. \code{pids}는 프로세스 수를 제한하는 Liz Rice 시연의 포크 폭탄 울타리다. \code{cpuset}은 그룹을 특정 코어에 고정하며, 제2장 전용 코어 인스턴스의 컨테이너 사촌이다. 이 책의 방향을 결정하므로 빈 공간에도 주목해야 한다. \textbf{cgroup에는 GPU 컨트롤러가 없다.} 커널은 \code{/\allowbreak dev/\allowbreak nvidia*} 장치에 대한 \textit{접근}을 통제할 수 있으며, 권한 수준에서 \code{--gpus}가 작동하는 방식이다. 4주 차에 도구의 배관을 보여 준다. 그러나 cgroup 트리에는 \code{cpu.max}와 \code{memory.max}처럼 GPU 계산 시간을 나누거나 VRAM을 분할하는 것이 없다. 구체적으로 GPU 하나에 프로세스 둘을 놓으면 어느 쪽이든 VRAM 전체를 \code{cudaMalloc}하거나 SM을 독점할 수 있다. 이 부재 때문에 GPU 공유에는 제2장의 공급자 메커니즘인 시간 분할, MPS, MIG가 필요하며 12주 차 GPU 공유 도구 상자는 이 절과 전혀 다르게 생겼다.
 
 \begin{tbbtablewrap}
   \begin{tabular}{@{}>{\raggedright\arraybackslash}m{\dimexpr 0.3511\tbltextwidth-2\tabcolsep\relax} >{\raggedright\arraybackslash}m{\dimexpr 0.3298\tbltextwidth-2\tabcolsep\relax} >{\raggedright\arraybackslash}m{\dimexpr 0.3191\tbltextwidth-2\tabcolsep\relax}@{}}
@@ -459,7 +459,7 @@ PID   USER   COMMAND
 
 \subsection*{그렇다면 Docker가 실제로 더하는 것은 무엇인가?}
 
-레시피 주위의 모든 것을 더하지만 커널 안에는 아무것도 더하지 않는다. \textbf{이미지와 레지스트리:} rootfs를 내용 주소화 계층으로 패키징하는 표준 방식이다. 각 계층은 바이트의 SHA-256으로 이름을 붙이므로 계층 캐시를 신뢰할 수 있다. 네트워크로 옮기고 어느 머신에서든 바이트까지 똑같이 재현하여 "내 노트북에서 작동한다"를 "GPU 노드에서도 작동한다"로 바꾼다. \textbf{네트워킹 기본값:} §3.2의 veth/브리지/NAT 배선을 컨테이너마다 만들고 제거하므로 \code{ip link add}를 직접 입력할 필요가 없다. \textbf{수명 주기와 API:} tmux 창에 unshare를 잔뜩 쌓는 대신 재시작 정책과 로그 캡처를 갖춘 데몬 기반 API로 create/start/stop/exec/logs를 제공한다. 그리고 \textbf{런타임 분리:} Docker 자체는 실제 레시피 실행을 아래로 위임한다. Docker → \code{containerd}(수명 주기 관리자) → \code{runc}로 이어진다. runc는 다섯 단계를 엄격하게 수행하는 것이 \textit{유일한 임무}인 작은 독립 실행 바이너리다. 어느 네임스페이스를 unshare할지, 어떤 cgroup 값을 쓸지, 어느 rootfs로 pivot할지를 지정하는 JSON 파일(OCI 런타임 명세)이 구동하며, 이 장을 구성으로 번역한 것처럼 읽힌다. 이 표준화된 바닥 계층 덕분에 제2장의 Kata와 gVisor가 Kubernetes 아래에서 대체재로 끼어들 수 있다. 바로 다음 주의 주제이며, 이 과정이 아껴 둔 질문인 GPU를 상자 안에 주입하는 방식도 다룬다.
+레시피 주위의 모든 것을 더하지만 커널 안에는 아무것도 더하지 않는다. \textbf{이미지와 레지스트리:} rootfs를 내용 주소화 계층으로 패키징하는 표준 방식이다. 각 계층은 바이트의 SHA-256으로 이름을 붙이므로 계층 캐시를 신뢰할 수 있다. 네트워크로 옮기고 어느 머신에서든 바이트까지 똑같이 재현하여 "내 노트북에서 작동한다"를 "GPU 노드에서도 작동한다"로 바꾼다. \textbf{네트워킹 기본값:} §3.2의 veth/브리지/NAT 배선을 컨테이너마다 만들고 제거하므로 \code{ip link add}를 직접 입력할 필요가 없다. \textbf{수명 주기와 API:} tmux 창에 unshare를 잔뜩 쌓는 대신 재시작 정책과 로그 캡처를 갖춘 데몬 기반 API로 create/start/stop/exec/logs를 제공한다. 그리고 \textbf{런타임 분리:} Docker 자체는 실제 레시피 실행을 아래로 위임한다. Docker → \code{containerd}(수명 주기 관리자) → \code{runc}로 이어진다. runc는 다섯 단계를 엄격하게 수행하는 것이 \textit{유일한 임무}인 작은 독립 실행 바이너리다. 어느 네임스페이스를 unshare할지, 어떤 cgroup 값을 쓸지, 어느 rootfs로 pivot할지를 지정하는 JSON 파일(OCI 런타임 명세)이 구동하며, 이 장을 구성으로 번역한 것처럼 읽힌다. 이 표준화된 바닥 계층 덕분에 제2장의 Kata와 gVisor가 Kubernetes 아래에서 대체재로 끼어들 수 있다. 바로 다음 주의 주제이며, 이 책이 아껴 둔 질문인 GPU를 상자 안에 주입하는 방식도 다룬다.
 
 \begin{calloutbox}{tbbpurple}{tbbpurplefill}
 {\normalsize\bfseries\color{tbbpurple}생각해 보기}\par\vspace{3pt}
@@ -472,7 +472,7 @@ PID   USER   COMMAND
 
 \section{심판이 모델을 죽일 때: OOM 대응 지침}
 
-이 장의 모든 메커니즘은 프로덕션의 한순간으로 모인다. 이 과정에서 절 하나를 온전히 할애할 만큼 흔한 상황이다. 추론 서버가 실행되고 트래픽이 흐르다가 프로세스가 사라진다. 스택 추적도 마지막 로그 줄도 없으며 애플리케이션 텔레메트리에는 침묵만 남는다. 어딘가에서 재시작 루프가 시작된다. 이것이 컨테이너화 모델 서버가 죽는 가장 흔한 단일 방식인 \textbf{OOM 강제 종료}다. 이 절을 마치면 진단하기 가장 쉬운 문제 중 하나가 된다(그림 3-7).
+이 장의 모든 메커니즘은 프로덕션의 한순간으로 모인다. 이 책에서 절 하나를 온전히 할애할 만큼 흔한 상황이다. 추론 서버가 실행되고 트래픽이 흐르다가 프로세스가 사라진다. 스택 추적도 마지막 로그 줄도 없으며 애플리케이션 텔레메트리에는 침묵만 남는다. 어딘가에서 재시작 루프가 시작된다. 이것이 컨테이너화 모델 서버가 죽는 가장 흔한 단일 방식인 \textbf{OOM 강제 종료}다. 이 절을 마치면 진단하기 가장 쉬운 문제 중 하나가 된다(그림 3-7).
 
 \begin{tbbfigure}
   \adjustbox{max width=0.94\linewidth,max totalheight=0.46\textheight}{\includegraphics{figures/fig3-7_oom.png}}\\[3pt]
@@ -545,7 +545,7 @@ CPU에서 서빙하는 BERT-base 분류기를 생각해 보자. 실습 B부 워�
 
 \section{실습: 미니 컨테이너와 관찰한 OOM}
 
-이번 주 실습은 상자를 만들고 그 벽에 부딪히는 이 장의 흐름을 반영한 두 부분으로 이루어진다. 어느 Linux VM이나 과정의 클라우드 인스턴스에서도 실행할 수 있으며 GPU는 필요 없다. OOM 시연은 의도적으로 CPU만 사용하므로 비싼 인스턴스도 위험하지 않다. 안내서에는 정확한 명령이 있고, 이 절에서는 의도·프로토콜·예상 관찰 결과를 정해 실습에서 맹목적으로 입력하지 않고 예측을 \textit{확인}하게 한다. 산출물은 명령 기록의 핵심과 이 장의 절에 각각 연결한 관찰 세 가지를 담은 1쪽 보고서다.
+이번 주 실습은 상자를 만들고 그 벽에 부딪히는 이 장의 흐름을 반영한 두 부분으로 이루어진다. 어느 Linux VM이나 이 책의 클라우드 인스턴스에서도 실행할 수 있으며 GPU는 필요 없다. OOM 시연은 의도적으로 CPU만 사용하므로 비싼 인스턴스도 위험하지 않다. 안내서에는 정확한 명령이 있고, 이 절에서는 의도·프로토콜·예상 관찰 결과를 정해 실습에서 맹목적으로 입력하지 않고 예측을 \textit{확인}하게 한다. 산출물은 명령 기록의 핵심과 이 장의 절에 각각 연결한 관찰 세 가지를 담은 1쪽 보고서다.
 
 \subsection*{A부 — 다섯 단계 실행하기}
 
@@ -737,7 +737,7 @@ $ echo $?
 \begin{tbbitemize}
   \item \textbf{[이번 주] Liz Rice, "Containers from Scratch" (GOTO 2018, video)} — 이번 주 필수 시청 자료이자 실습의 원전이다. 수십 줄의 Go로 컨테이너를 실시간으로 만든다. A부를 직접 시도한 \textit{뒤}에 보자. 기시감 자체가 목적이다.
   \item \textbf{[이번 주] man 페이지: namespaces(7), cgroups(7), unshare(1), pivot\_root(2)} — 커널 문서치고 유난히 잘 썼으며 §3.2–3.3의 권위 있는 세부 사항을 제공한다. namespaces(7)은 한 번 완전히 읽고 나머지는 실습 지원 자료로 훑어본다.
-  \item \textbf{Liz Rice, "Container Security" (O'Reilly, 2020)} — 이 장의 세계관을 책 한 권으로 확장했다. 제2\textasciitilde{}6장은 이 과정의 서빙 관점을 보완하는 보안 관점으로 네임스페이스, cgroup, 이미지 계층을 다룬다.
+  \item \textbf{Liz Rice, "Container Security" (O'Reilly, 2020)} — 이 장의 세계관을 책 한 권으로 확장했다. 제2\textasciitilde{}6장은 이 책의 서빙 관점을 보완하는 보안 관점으로 네임스페이스, cgroup, 이미지 계층을 다룬다.
   \item \textbf{cgroup v2 커널 문서(admin-guide/cgroup-v2)} — 컨트롤러 의미론의 1차 자료다. 메모리 컨트롤러 절은 §3.6의 해설처럼 읽힌다. 설계 역사를 보려면 LWN의 cgroup v2 연재와 함께 읽는다.
   \item \textbf{Docker 문서: "About storage drivers"와 "Use the OverlayFS storage driver"} — 계층, copy-up, whiteout을 구체적인 그림과 함께 다룬다. §3.4의 실용적 동반 자료다.
   \item \textbf{[4주 차] OCI Runtime Specification} (opencontainers.org) — 지금 config.json을 한 번 훑어보면 모든 필드(네임스페이스, cgroup, 마운트, 루트)가 이 장을 JSON으로 옮긴 것임을 알아볼 수 있다. 4주 차의 중심이 된다.
@@ -749,5 +749,5 @@ $ echo $?
 
 \begin{calloutbox}{tbbblue}{tbbbluefill}
 {\normalsize\bfseries\color{tbbblue}다음 장 — 제4장: Docker와 컨테이너 런타임 스택}\par\vspace{3pt}
-이제 맨손으로 컨테이너를 만들 수 있다. 다음 주에는 이 일을 하루에 10억 번 수행하는 산업용 기계를 만난다. 구성 요소가 Docker → containerd → runc로 조직되는 방식, OCI 명세가 런타임을 교체 가능하게 하는 이유(Kubernetes 아래에 들어간 Kata와 gVisor를 떠올리자), 이미지를 잘 빌드하는 법(Dockerfile 계층 규율, 다단계 빌드 — §3.4를 엔지니어링 실무로 전환), 이미지를 옮기는 법(레지스트리, 다이제스트, 가져오기 — 콜드 스타트 항목)을 배운다. 그리고 이 과정이 아껴 둔 질문을 다룬다. \textbf{GPU는 상자 안에 어떻게 들어가는가?} NVIDIA Container Toolkit, 장치 주입, "cgroup은 GPU 계산을 스케줄링할 수 없다"는 사실(§3.3)이 ML 컨테이너의 모든 것을 좌우하는 이유를 설명한다. 실습에서는 1주 차 스택 그림의 FastAPI 모델 서버를 컨테이너화해 레지스트리에 푸시한다. 5주 차에 Kubernetes에 배포할 이미지다.
+이제 맨손으로 컨테이너를 만들 수 있다. 다음 주에는 이 일을 하루에 10억 번 수행하는 산업용 기계를 만난다. 구성 요소가 Docker → containerd → runc로 조직되는 방식, OCI 명세가 런타임을 교체 가능하게 하는 이유(Kubernetes 아래에 들어간 Kata와 gVisor를 떠올리자), 이미지를 잘 빌드하는 법(Dockerfile 계층 규율, 다단계 빌드 — §3.4를 엔지니어링 실무로 전환), 이미지를 옮기는 법(레지스트리, 다이제스트, 가져오기 — 콜드 스타트 항목)을 배운다. 그리고 이 책이 아껴 둔 질문을 다룬다. \textbf{GPU는 상자 안에 어떻게 들어가는가?} NVIDIA Container Toolkit, 장치 주입, "cgroup은 GPU 계산을 스케줄링할 수 없다"는 사실(§3.3)이 ML 컨테이너의 모든 것을 좌우하는 이유를 설명한다. 실습에서는 1주 차 스택 그림의 FastAPI 모델 서버를 컨테이너화해 레지스트리에 푸시한다. 5주 차에 Kubernetes에 배포할 이미지다.
 \end{calloutbox}
