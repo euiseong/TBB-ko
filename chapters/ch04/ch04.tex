@@ -1,7 +1,7 @@
 %% Chapter 4 — Docker와 컨테이너 런타임 스택
 \setcounter{chapter}{3}
 \chapter{Docker와 컨테이너 런타임 스택}
-\chaptersubtitle{다섯 동작에서 산업으로: 이미지, 레지스트리, OCI 분리, 그리고 GPU를 상자에 넣는 법}
+\chaptersubtitle{다섯 단계에서 산업으로: 이미지, 레지스트리, OCI 분리, 그리고 GPU를 상자에 넣는 법}
 
 \begin{calloutbox}{tbbblue}{tbbbluefill}
 {\normalsize\bfseries\color{tbbblue}학습 목표}\par\vspace{3pt}
@@ -27,7 +27,7 @@
 
 \begin{calloutbox}{tbblightgray}{tbbboxfill}
 {\normalsize\bfseries\color{tbbink}장 구성}\par\vspace{3pt}
-\textbf{4.1} 다섯 동작에서 산업으로    \textbf{4.2} 스택: Docker → containerd → runc와 OCI 접합부    \textbf{4.3} 엔지니어링 결과물로서의 이미지: 계층, 다이제스트, Dockerfile    \textbf{4.4} 레지스트리: 콘텐츠 주소 기반 배포    \textbf{4.5} GPU를 상자 안에 넣는 법    \textbf{4.6} 검시관처럼 컨테이너 읽기: inspect 현장 안내서    \textbf{4.7} 실습: 모델 서버를 컨테이너화하고 push한 뒤 검증하기. 이어서 요약, 연습문제, 더 읽을거리가 나온다.
+\textbf{4.1} 다섯 단계에서 산업으로    \textbf{4.2} 스택: Docker → containerd → runc와 OCI 접합부    \textbf{4.3} 엔지니어링 결과물로서의 이미지: 계층, 다이제스트, Dockerfile    \textbf{4.4} 레지스트리: 콘텐츠 주소 기반 배포    \textbf{4.5} GPU를 상자 안에 넣는 법    \textbf{4.6} 검시관처럼 컨테이너 읽기: inspect 현장 안내서    \textbf{4.7} 실습: 모델 서버를 컨테이너화하고 push한 뒤 검증하기. 이어서 요약, 연습문제, 더 읽을거리가 나온다.
 \end{calloutbox}
 
 \vspace{3.0pt}
@@ -37,7 +37,7 @@
 이번에도 터미널에서 시작한다. §4.4까지의 모든 내용은 Docker가 설치된 머신이라면 어디서나 재현할 수 있다. 제2장에서 만든 VM이나 노트북이면 충분하고, 실습 레지스트리는 로컬 \code{registry:2} 컨테이너이므로 계정도 비용도 필요 없다. §4.5의 GPU 터미널 기록은 GPU 노드에서 실행한 것으로 표시한다. 하드웨어가 없는 팀은 내용을 읽은 뒤 5주 차 관리형 클러스터 부록에서 재현한다. 가능하면 강의 전에 터미널 기록 4-1을 직접 실행해 보자. 프로세스 트리 한 장에 이 장의 논지가 모두 담겨 있다.
 \end{calloutbox}
 
-\section{다섯 동작에서 산업으로}
+\section{다섯 단계에서 산업으로}
 
 제3장은 맨손으로 컨테이너를 만들었다는 자랑으로 끝났다. 이 장에서 그 기술을 산업화하기 전에 더 근본적인 질문에 답해야 한다. \textit{사람들은 왜 굳이 이런 수고를 하는가?} "컨테이너가 VM보다 가볍기 때문"이라는 답은 제2장에서 이미 다루었고, "Kubernetes가 필요로 하기 때문"이라는 답은 제5장의 주제다. 출발점은 훨씬 인간적인 이유다. 세상의 모든 엔지니어링 팀이 한 번쯤 겪었을 만큼 보편적인 작은 참사다. 수많은 실화를 바탕으로 재구성해 보자.
 
@@ -114,7 +114,7 @@ hello                    # the ENTIRE filesystem. one file.
 
 \subsection*{영역에 들어가기 전에 지도를 보자}
 
-움직이는 부품의 이름이 많으므로 먼저 지도를 고정하자. \code{docker run}을 입력하면 네 프로그램이 협력한다. \textbf{CLI}는 REST 클라이언트일 뿐이다. 제5장의 kubectl과 같은 방식으로 신비를 벗긴다. 이 책에서는 "플랫폼"을 열어 볼 때마다 HTTP 클라이언트가 튀어나온다. \textbf{데몬}(\code{dockerd})은 개발자용 API와 편의 기능을 맡는다. \textbf{수명 주기 엔진}(\code{containerd})은 이미지와 실행 중인 작업을 관리하며, Kubernetes는 Docker를 건너뛰고 이를 \textit{직접} 사용한다. \textbf{런타임}(\code{runc})은 JSON 규격을 엄격히 따라 제3장의 다섯 동작을 수행한 뒤 \textit{종료}하는 것이 전부다. containerd와 프로세스 사이에는 작지만 오래 살아남는 \textbf{shim}이 있어, 이후 그 프로세스를 책임진다. §4.2에서는 터미널 기록으로 이 사슬을 따라간다. 한 문장으로 요약하면 다음과 같다. \textbf{Docker 스택의 어떤 것도 모델을 직접 실행하지 않는다. 실행은 커널이 한다. 나머지는 네임스페이스, cgroup, overlayfs 주변의 장부 정리이며, 바로 그 때문에 모든 부품을 교체할 수 있다.}
+움직이는 부품의 이름이 많으므로 먼저 지도를 고정하자. \code{docker run}을 입력하면 네 프로그램이 협력한다. \textbf{CLI}는 REST 클라이언트일 뿐이다. 제5장의 kubectl과 같은 방식으로 신비를 벗긴다. 이 책에서는 "플랫폼"을 열어 볼 때마다 HTTP 클라이언트가 튀어나온다. \textbf{데몬}(\code{dockerd})은 개발자용 API와 편의 기능을 맡는다. \textbf{수명 주기 엔진}(\code{containerd})은 이미지와 실행 중인 작업을 관리하며, Kubernetes는 Docker를 건너뛰고 이를 \textit{직접} 사용한다. \textbf{런타임}(\code{runc})은 JSON 규격을 엄격히 따라 제3장의 다섯 단계을 수행한 뒤 \textit{종료}하는 것이 전부다. containerd와 프로세스 사이에는 작지만 오래 살아남는 \textbf{shim}이 있어, 이후 그 프로세스를 책임진다. §4.2에서는 터미널 기록으로 이 사슬을 따라간다. 한 문장으로 요약하면 다음과 같다. \textbf{Docker 스택의 어떤 것도 모델을 직접 실행하지 않는다. 실행은 커널이 한다. 나머지는 네임스페이스, cgroup, overlayfs 주변의 장부 정리이며, 바로 그 때문에 모든 부품을 교체할 수 있다.}
 
 두 결과물이 이 장치 안을 흐르며 장 중반의 중심을 잡는다. \textbf{이미지}(§4.3)는 제3장의 overlayfs 계층 스택에 운반 가능한 콘텐츠 주소 기반 파일 형식을 입히고, 런타임이 무엇을 해야 하는지 알려 주는 설정을 더한 것이다. \textbf{레지스트리}(§4.4)는 이 결과물이 이동하는 배포 시스템이다. 모든 대화가 다이제스트로 이루어지므로 코드 한 줄을 바꿔 push할 때는 KB만 움직이지만 CUDA 베이스를 처음 pull할 때는 GB가 움직인다. 제6장에서 모델 저장소를 만들 때 불변의 버전 결과물, 체크섬, "새 버전 = 새 접두사"가 익숙했다면 이미 몇 주 동안 이 장의 레지스트리 규율을 \textit{사용}했기 때문이다. 이미지는 이 책이 콘텐츠 주소 기반 저장소로 운반한 첫 결과물이었다. 책의 순서로는 여기서 한 번 배우고 다른 곳에서 계속 알아보게 된다.
 
@@ -157,7 +157,7 @@ containerd-shim(41288)---sleep(41320)
 \end{terminalbox}
 \figcaption{터미널 기록 4-1  가족 관계를 조사한 결과. 컨테이너의 조상에는 dockerd도 runc도 없다. 평범한 프로세스를 붙들고 있는 작은 shim, 곧 제3장의 PID 41288만 남아 있다.}
 
-각 구성 요소의 단 하나뿐인 역할과 함께 명단을 읽어 보자. \textbf{docker CLI}는 REST 클라이언트다. \code{docker run}은 Unix 소켓에 보내는 몇 번의 HTTP 호출이며, \code{docker --debug}가 그대로 보여 준다. \textbf{dockerd}는 그 소켓 뒤의 데몬으로 개발자용 API, \code{docker build}, 네트워크와 볼륨 편의 기능을 맡는다. 컨테이너를 직접 실행하지 않고 gRPC를 통해 이미지·스냅숏(제3장의 overlayfs 스택)·실행 중인 작업을 관리하는 수명 주기 엔진 \textbf{containerd}에 위임한다. 작업을 시작할 때 containerd는 \textbf{containerd-shim}을 만들고, shim은 JSON 규격을 읽어 제3장의 다섯 동작을 프로덕션 수준으로 수행하는 작은 독립 바이너리 \textbf{runc}를 호출한다. runc는 프로세스를 시작한 뒤 \textit{종료}한다. 실행 중에 남는 것은 터미널 기록 그대로다. 프로세스 하나, shim 하나, 제3장의 커널 메커니즘이다. "컨테이너 런타임"은 상주하는 하이퍼바이저가 아니라 설치 작업반이다. 컨테이너 하나당 오버헤드는 작은 프로세스 하나뿐이며, 제2장의 격리 스펙트럼에서 컨테이너가 그 위치에 놓인 큰 이유다.
+각 구성 요소의 단 하나뿐인 역할과 함께 명단을 읽어 보자. \textbf{docker CLI}는 REST 클라이언트다. \code{docker run}은 Unix 소켓에 보내는 몇 번의 HTTP 호출이며, \code{docker --debug}가 그대로 보여 준다. \textbf{dockerd}는 그 소켓 뒤의 데몬으로 개발자용 API, \code{docker build}, 네트워크와 볼륨 편의 기능을 맡는다. 컨테이너를 직접 실행하지 않고 gRPC를 통해 이미지·스냅숏(제3장의 overlayfs 스택)·실행 중인 작업을 관리하는 수명 주기 엔진 \textbf{containerd}에 위임한다. 작업을 시작할 때 containerd는 \textbf{containerd-shim}을 만들고, shim은 JSON 규격을 읽어 제3장의 다섯 단계을 프로덕션 수준으로 수행하는 작은 독립 바이너리 \textbf{runc}를 호출한다. runc는 프로세스를 시작한 뒤 \textit{종료}한다. 실행 중에 남는 것은 터미널 기록 그대로다. 프로세스 하나, shim 하나, 제3장의 커널 메커니즘이다. "컨테이너 런타임"은 상주하는 하이퍼바이저가 아니라 설치 작업반이다. 컨테이너 하나당 오버헤드는 작은 프로세스 하나뿐이며, 제2장의 격리 스펙트럼에서 컨테이너가 그 위치에 놓인 큰 이유다.
 
 \subsection*{shim이 제 밥값을 하는 모습 — 실시간 확인}
 
@@ -205,7 +205,7 @@ print(json.dumps({k:c[k] for k in ['process','root','linux']}, indent=1)[:600])"
 
 \begin{tbbfigure}
   \adjustbox{max width=0.94\linewidth,max totalheight=0.46\textheight}{\includegraphics{figures/fig4-1_flow.png}}\\[3pt]
-  \figcaption{그림 4-1  docker run의 흐름과 이후 남는 구성 요소. CLI와 데몬은 장부를 정리하고, runc는 제3장의 다섯 동작을 수행한 뒤 종료한다. 컨테이너마다 shim 하나가 남아 꼭 붙들어야 할 것을 맡는다.}
+  \figcaption{그림 4-1  docker run의 흐름과 이후 남는 구성 요소. CLI와 데몬은 장부를 정리하고, runc는 제3장의 다섯 단계을 수행한 뒤 종료한다. 컨테이너마다 shim 하나가 남아 꼭 붙들어야 할 것을 맡는다.}
 \end{tbbfigure}
 
 \begin{tbbfigure}
@@ -475,7 +475,7 @@ $ CG=$(cat /proc/$PID/cgroup | cut -d: -f3) && \
 
 \subsection*{A부: 제대로 빌드하고 계층의 동작을 증명하기}
 
-\code{serve.py}를 작성한다. 배포 자료에는 제5장과 제6장에서 프로브할 \code{/\allowbreak predict}, \code{/\allowbreak healthz}, \code{/\allowbreak ready} 엔드포인트를 가진 FastAPI 앱 뼈대가 있다. 두 번 컨테이너화한다. 먼저 단일 단계, 전체 베이스, \code{pip install}보다 앞선 \code{COPY . .}를 쓰는 \textbf{단순 빌드}를 만든다. 다음은 터미널 기록 4-5의 다단계 Dockerfile과 \code{.dockerignore}를 쓴 \textbf{설계 빌드}다. 각각 이미지 크기(\code{docker images}), 계층 지도(\code{docker history}), 순서의 효과를 체감하게 할 측정값인 \textbf{serve.py 한 줄 변경 뒤 재빌드 시간과 "이동할 바이트"}를 기록한다. 둘 다 다시 빌드해 단순 빌드는 pip를 재실행하지만 설계 빌드는 캐시 계층을 모두 재사용해 몇 초 만에 끝나는 모습을 확인한다. \code{docker image inspect --format '\{\{.Architecture\}\}'}로 아키텍처도 명시적으로 확인한다. Apple Silicon 팀은 \code{--platform linux/\allowbreak amd64}를 추가하고 에뮬레이션 비용을 보고서에 적는다.
+\code{serve.py}를 작성한다. 유인물에는 제5장과 제6장에서 프로브할 \code{/\allowbreak predict}, \code{/\allowbreak healthz}, \code{/\allowbreak ready} 엔드포인트를 가진 FastAPI 앱 뼈대가 있다. 두 번 컨테이너화한다. 먼저 단일 단계, 전체 베이스, \code{pip install}보다 앞선 \code{COPY . .}를 쓰는 \textbf{단순 빌드}를 만든다. 다음은 터미널 기록 4-5의 다단계 Dockerfile과 \code{.dockerignore}를 쓴 \textbf{설계 빌드}다. 각각 이미지 크기(\code{docker images}), 계층 지도(\code{docker history}), 순서의 효과를 체감하게 할 측정값인 \textbf{serve.py 한 줄 변경 뒤 재빌드 시간과 "이동할 바이트"}를 기록한다. 둘 다 다시 빌드해 단순 빌드는 pip를 재실행하지만 설계 빌드는 캐시 계층을 모두 재사용해 몇 초 만에 끝나는 모습을 확인한다. \code{docker image inspect --format '\{\{.Architecture\}\}'}로 아키텍처도 명시적으로 확인한다. Apple Silicon 팀은 \code{--platform linux/\allowbreak amd64}를 추가하고 에뮬레이션 비용을 보고서에 적는다.
 
 \subsection*{B부: 실행하고 제한하고 감사하기(강의계획서의 inspect 연습)}
 
@@ -510,7 +510,7 @@ $ CG=$(cat /proc/$PID/cgroup | cut -d: -f3) && \
 
 \qitem{1}{\textbf{프로덕션 컨테이너화는 더 큰 셸 스크립트가 아니라 세 산업적 문제}, 곧 패키징·배포·수명 주기를 푸는 일이다. Docker는 셋을 모두 해결했고 OCI는 그 해법을 누구나 구현할 수 있는 인터페이스로 표준화했다.}
 
-\qitem{2}{\textbf{스택의 각 계층에는 역할이 하나뿐이다.} docker CLI(REST 클라이언트) → dockerd(API와 편의 기능) → containerd(수명 주기 엔진이며 kubelet의 직접 통신 상대) → containerd-shim(컨테이너마다 하나씩 stdio·종료 코드·회수를 담당) → runc(JSON 규격에 따라 제3장의 다섯 동작을 수행한 뒤 종료)로 이어진다. 스택이 모델을 실행하는 것이 아니라 커널이 실행한다.}
+\qitem{2}{\textbf{스택의 각 계층에는 역할이 하나뿐이다.} docker CLI(REST 클라이언트) → dockerd(API와 편의 기능) → containerd(수명 주기 엔진이며 kubelet의 직접 통신 상대) → containerd-shim(컨테이너마다 하나씩 stdio·종료 코드·회수를 담당) → runc(JSON 규격에 따라 제3장의 다섯 단계을 수행한 뒤 종료)로 이어진다. 스택이 모델을 실행하는 것이 아니라 커널이 실행한다.}
 
 \qitem{3}{\textbf{shim은 제3장의 수수께끼 같은 부모 PID 41288을 설명한다.} 가장 작고 지루한 프로그램이 프로세스에 가장 가까이 있으므로 그 위의 모든 구성 요소가 장애·업그레이드·재시작을 겪어도 컨테이너에는 아무 일도 일어나지 않는다.}
 
@@ -610,7 +610,7 @@ $ CG=$(cat /proc/$PID/cgroup | cut -d: -f3) && \
 
 \qitem{1}{\textbf{②} shim은 실행 중에 데몬이 하중을 떠받치는 부품이 되지 않게 하려고 존재한다. PID 1의 자식으로 stdio와 종료 코드를 붙든다. 터미널 기록 4-2에서 데몬 재시작으로 직접 증명했다. (§4.2)}
 
-\qitem{2}{\textbf{③} runc는 상주 프로그램이 아니라 설치 작업반이다. config.json에 따라 다섯 동작을 수행한 뒤 종료한다. ②는 CRI 통신 상대인 containerd와 혼동했다. (§4.2)}
+\qitem{2}{\textbf{③} runc는 상주 프로그램이 아니라 설치 작업반이다. config.json에 따라 다섯 단계을 수행한 뒤 종료한다. ②는 CRI 통신 상대인 containerd와 혼동했다. (§4.2)}
 
 \qitem{3}{\textbf{②} 중복 제거가 곧 프로토콜이다. push는 "없는 다이제스트가 무엇인가?"라고 묻는다. 순서가 올바르면 40 KB 코드 계층만 새롭다. ③처럼 소스 차이를 보내는 것이 아니며 단위는 차이가 아니라 계층이다. (§4.3–4.4)}
 
@@ -622,7 +622,7 @@ $ CG=$(cat /proc/$PID/cgroup | cut -d: -f3) && \
 
 \subsection*{B. 단답형}
 
-\qitem{1}{CLI는 REST 클라이언트다. dockerd는 개발자 API, 빌드, 편의 기능을 맡는다. containerd는 이미지·스냅숏·작업의 수명 주기를 관리하며 CRI를 통한 kubelet의 통신 상대다. shim은 컨테이너별 stdio·종료 코드·회수를 장기간 맡는다. runc는 config.json의 다섯 동작을 수행하고 종료한다. 프로세스 트리에 없는 것은 dockerd와 runc다. dockerd는 처음부터 조상이 아니며 shim은 PID 1의 자식이 되고, runc는 설정 뒤 종료한다. (§4.2)}
+\qitem{1}{CLI는 REST 클라이언트다. dockerd는 개발자 API, 빌드, 편의 기능을 맡는다. containerd는 이미지·스냅숏·작업의 수명 주기를 관리하며 CRI를 통한 kubelet의 통신 상대다. shim은 컨테이너별 stdio·종료 코드·회수를 장기간 맡는다. runc는 config.json의 다섯 단계을 수행하고 종료한다. 프로세스 트리에 없는 것은 dockerd와 runc다. dockerd는 처음부터 조상이 아니며 shim은 PID 1의 자식이 되고, runc는 설정 뒤 종료한다. (§4.2)}
 
 \qitem{2}{다이제스트는 매니페스트의 sha256 정체로 구조상 불변이다. 태그는 이름→다이제스트를 잇는 가변 포인터다. 태그가 이동하거나 다시 push되면 노드와 시간에 따라 "v2"가 다른 바이트를 뜻해 감사 기록이 사라지고 캐시가 오염된다. 한 계층 위의 같은 규율은 §6.3 모델 저장소 버전(새 버전 = 새 접두사, sha256 매니페스트)과 13주 차 다이제스트 승격 파이프라인에 적용된다. (§4.3, §6.3)}
 
