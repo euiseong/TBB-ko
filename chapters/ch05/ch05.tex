@@ -245,7 +245,7 @@ model-server-7d4b9c6f5-fh5m8    0/1    Running   10.244.1.44   node-a
 
 \subsection*{프로브: 세 질문과 서로 다른 세 결과}
 
-kubelet은 모든 컨테이너에 세 가지 질문을 계속 던진다. 서빙 시스템의 생사는 이 답을 구별하는 데 달려 있다. \textbf{startupProbe}는 "부팅을 마쳤는가?"를 묻는다. 모델 때문에 시작이 느려지는 상황을 위해 존재하며, 실행되는 동안 다른 두 프로브(probe)는 중지된다. 예산(\code{failureThreshold × periodSeconds}; 터미널 기록 5-3에서는 3분)은 최악의 가중치 로딩 시간을 포괄해야 한다. \textbf{readinessProbe}는 "트래픽을 보내도 되는가?"를 묻고, 오직 Service 엔드포인트의 구성원 자격만 제어한다. 준비 상태 검사 실패는 아무것도 재시작하지 않는다. 조용히 파드를 로테이션에서 제외하며, 이는 로딩 중이거나 과부하 상태이거나 처리 중인 요청을 비우는 동안 원하는 동작이다. \textbf{livenessProbe}는 "살아 있기는 한가?"를 묻는 둔중한 도구다. 실패하면 컨테이너를 종료하고 재시작한다. 의존성이 아니라 프로세스 자체의 상태(이벤트 루프의 응답 여부)를 검사해야 하며, 충분히 긴 주기와 넉넉한 임계값을 두어 \textit{느긋하게} 동작해야 한다.
+kubelet은 모든 컨테이너에 세 가지 질문을 계속 던진다. 서빙 시스템의 생사는 이 답을 구별하는 데 달려 있다. \textbf{startupProbe}는 "부팅을 마쳤는가?"를 묻는다. 모델 때문에 시작이 느려지는 상황을 위해 존재하며, 실행되는 동안 다른 두 프로브(probe)는 중지된다. 예산(\code{failureThreshold × periodSeconds}; 터미널 기록 5-3에서는 3분)은 최악의 가중치 로딩 시간을 포괄해야 한다. \textbf{readinessProbe}는 "트래픽을 보내도 되는가?"를 묻고, 오직 Service 엔드포인트의 구성원 자격만 제어한다. 준비 상태 검사 실패는 아무것도 재시작하지 않는다. 조용히 파드를 로테이션에서 제외하며, 이는 로딩 중이거나 과부하 상태이거나 처리 중인 요청을 비우는 동안 원하는 동작이다. \textbf{livenessProbe}는 "살아 있기는 한가?"를 묻는 둔중한 도구다. 실패하면 컨테이너를 종료하고 재시작한다. 의존성이 아니라 프로세스 자체의 상태(이벤트 루프의 응답 여부)를 검사해야 하며, 충분히 긴 주기와 넉넉한 임곗값을 두어 \textit{느긋하게} 동작해야 한다.
 
 이제 대표적인 서빙 사고를 한 문장으로 설명할 수 있다. 기본 대기 시간으로 설정된 활성 상태 프로브가 모델 로딩에 90초가 걸리는 서버를 검사하면, 로딩 중인 컨테이너를 영원히 죽인다. \textbf{아무 문제가 없는 이미지에서 CrashLoopBackOff가 발생한다.} 실제 현장에서 틀림없이 만날 문제이므로 §5.6에서 터미널 기록과 함께 전체 사고를 재현한다. 예방책은 위의 startupProbe 설정이고, 진단 습관은 터미널 기록 5-4의 구분이다. Running은 Ready가 아니며, 어느 쪽도 죽었다는 뜻은 아니다.
 
@@ -742,7 +742,7 @@ Pending은 시스템에서 가장 충실하게 스스로 설명하는 상태다.
 
 \qitem{2}{스케줄러는 requests만 계산하므로 배치 과정에서 이를 초과 예약할 수 없다. limits는 합계가 노드 용량을 넘도록 의도적으로 허용하는 버스트 상한이다. 모두가 버스트할 수 있지만 동시에 그러는 일은 드물다는, 기능으로서의 오버커밋이다. 가정이 틀릴 때를 위한 안전장치는 컨테이너별 cgroup 벽(memory.max → OOMKilled/137)과 kubelet의 노드 압박 퇴거(QoS 순서, 상태 Evicted)다. (§5.4)}
 
-\qitem{3}{startupProbe: httpGet /healthz, periodSeconds 5, failureThreshold ≥ 30이다. 5 × 30 = 150 s > 120 s로 최악의 로딩 시간에 여유를 더해 다른 프로브를 보류한다. readinessProbe: /ready, 주기 5, 임계값 2–3으로 트래픽을 빠르게 제어한다. livenessProbe: /healthz, 주기 10–15, 임계값 3으로 의도적으로 느긋하게 잡아 실제 교착 상태만 재시작한다. (§5.3, §5.6)}
+\qitem{3}{startupProbe: httpGet /healthz, periodSeconds 5, failureThreshold ≥ 30이다. 5 × 30 = 150 s > 120 s로 최악의 로딩 시간에 여유를 더해 다른 프로브를 보류한다. readinessProbe: /ready, 주기 5, 임곗값 2–3으로 트래픽을 빠르게 제어한다. livenessProbe: /healthz, 주기 10–15, 임곗값 3으로 의도적으로 느긋하게 잡아 실제 교착 상태만 재시작한다. (§5.3, §5.6)}
 
 \qitem{4}{OOMKilled: 컨테이너가 자기 memory.max를 넘었고 커널 OOM 킬러가 SIGKILL을 보낸다. 징후는 Last State: OOMKilled, exit 137(+ dmesg)이다. Evicted: 오버커밋 상태에서 노드 자원이 부족해져 kubelet이 QoS/requests 초과 사용량에 따라 희생 대상을 종료한다. 징후는 상태 Evicted, "노드의 메모리 리소스가 부족함"이다. (§5.4, §5.6)}
 

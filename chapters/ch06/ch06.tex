@@ -304,7 +304,7 @@ model-00003.safetensors: OK        # verify before you serve. always.
 \end{terminalbox}
 \figcaption{터미널 기록 6-6  연결 방식. 서버가 시작되기 전에 initContainer가 emptyDir에 다운로드한다. 이제 startupProbe 예산(제5장)은 터미널 기록 6-5의 측정값으로 계산하는 숫자다.}
 
-각 요소는 의도된 역할 하나씩을 맡는다. \textbf{initContainer}는 서버 컨테이너가 시작되기 \textit{전에} 완료될 때까지 실행된다. 따라서 서버 이미지는 로더 의존성에서 자유롭고, 다운로드 실패는 별도의 \code{Init:Error} 상태로 나타나며(제5장의 현장 안내서에서 명확히 구별 가능), 로더도 독립적으로 업그레이드할 수 있다. \textbf{emptyDir}은 정직한 임시 공간이다. 노드 디스크에서 파드와 정확히 같은 기간만 존재하며(tmpfs가 필요하면 \code{medium: Memory}), 파드와 함께 삭제되는 것은 버그가 아니라 플랫폼이 아무것도 소유하지 않는 원칙을 강제한 결과다. \textbf{startupProbe} 예산은 더 이상 구전 지식이 아니라 산술이다. 측정한 다운로드(17 s) + 로드(10 s) + 여유분 → 임계값으로 정한다. 그리고 \textbf{환경 변수가 유일한 결합 지점}이다. 서버는 \code{/\allowbreak models}를 읽고 initContainer는 \code{MODEL\_URI}에서 파일을 가져와 채운다. \textit{두 이미지 어디에도 모델 버전은 나오지 않는다.} 이제 이 장에서 가장 멋진 터미널 기록을 볼 준비가 되었다.
+각 요소는 의도된 역할 하나씩을 맡는다. \textbf{initContainer}는 서버 컨테이너가 시작되기 \textit{전에} 완료될 때까지 실행된다. 따라서 서버 이미지는 로더 의존성에서 자유롭고, 다운로드 실패는 별도의 \code{Init:Error} 상태로 나타나며(제5장의 현장 안내서에서 명확히 구별 가능), 로더도 독립적으로 업그레이드할 수 있다. \textbf{emptyDir}은 정직한 임시 공간이다. 노드 디스크에서 파드와 정확히 같은 기간만 존재하며(tmpfs가 필요하면 \code{medium: Memory}), 파드와 함께 삭제되는 것은 버그가 아니라 플랫폼이 아무것도 소유하지 않는 원칙을 강제한 결과다. \textbf{startupProbe} 예산은 더 이상 구전 지식이 아니라 산술이다. 측정한 다운로드(17 s) + 로드(10 s) + 여유분 → 임곗값으로 정한다. 그리고 \textbf{환경 변수가 유일한 결합 지점}이다. 서버는 \code{/\allowbreak models}를 읽고 initContainer는 \code{MODEL\_URI}에서 파일을 가져와 채운다. \textit{두 이미지 어디에도 모델 버전은 나오지 않는다.} 이제 이 장에서 가장 멋진 터미널 기록을 볼 준비가 되었다.
 
 \begin{terminalbox}
 \begin{Verbatim}[breaklines=true,breakanywhere=true,fontsize=\small,formatcom=\color{tbbtermfg},codes=\tbbcodeactive]
@@ -762,7 +762,7 @@ Ingress 애드온을 활성화하고(\code{minikube addons enable ingress}), 자
 \textbf{[이번 주]} 표시가 붙은 항목은 이번 주 필독 자료다. \textbf{[N주 차]} 표시는 해당 주에 도움이 될 자료를 뜻한다.
 
 \begin{tbbitemize}
-  \item \textbf{[이번 주] AWS S3 documentation: "Performance Guidelines" and "Optimizing Amazon S3 Performance"} — §6.3 로더의 1차 자료다. 접두사별 요청 병렬 처리, 범위 GET, 멀티파트(multipart) 임계값을 다룬다. 짧고 구체적이며 같은 아이디어가 GCS에도 적용된다.
+  \item \textbf{[이번 주] AWS S3 documentation: "Performance Guidelines" and "Optimizing Amazon S3 Performance"} — §6.3 로더의 1차 자료다. 접두사별 요청 병렬 처리, 범위 GET, 멀티파트(multipart) 임곗값을 다룬다. 짧고 구체적이며 같은 아이디어가 GCS에도 적용된다.
   \item \textbf{[이번 주] safetensors documentation (Hugging Face)} — 형식의 헤더 배치, 설계에서 mmap 가능성이 자연스럽게 나오는 이유, 7주 차에 더 강하게 반복할 pickle 반대 보안 논거를 다룬다.
   \item \textbf{[이번 주] Kubernetes docs: "Ingress", "Init Containers", and "Volumes" (emptyDir)} — 이 장의 매니페스트를 구성하는 세 개념 페이지다. 타임아웃은 어노테이션에 있으므로 Ingress 문서를 컨트롤러의 어노테이션 레퍼런스와 함께 읽자.
   \item \textbf{AWS docs: "VPC endpoints for Amazon S3" and "NAT gateways" (pricing page included)} — 15분을 투자해 중간 규모 플릿에서 연간 약 \$5,000를 되찾는 §6.5 계산 예시의 공식 자료다.
