@@ -135,7 +135,7 @@ decode: 200 tokens in 4.28 s:             21.5 ms/token  (46.5 tok/s)
 # two machines, one API. every engine decision follows from this.
 \end{Verbatim}
 \end{terminalbox}
-\figcaption{기록 11-1  두 시계를 측정하고 제10장의 하한과 맞춘 결과. 프리필은 연산이며 디코드 약 3.4단계의 비용으로 500 tokens를 처리한다. 디코드는 대역폭이며 20 ms 하한에 소량이 더해진다. TTFT ≈ 대기열 + 프리필, TPOT ≈ 하한이다.}
+\figcaption{터미널 기록 11-1  두 시계를 측정하고 제10장의 하한과 맞춘 결과. 프리필은 연산이며 디코드 약 3.4단계의 비용으로 500 tokens를 처리한다. 디코드는 대역폭이며 20 ms 하한에 소량이 더해진다. TTFT ≈ 대기열 + 프리필, TPOT ≈ 하한이다.}
 
 \subsection*{두 시계에 SLO를 부여하다 — 스트림에 돌아온 Little의 법칙}
 
@@ -146,9 +146,9 @@ decode: 200 tokens in 4.28 s:             21.5 ms/token  (46.5 tok/s)
 \begin{calloutbox}{tbbpurple}{tbbpurplefill}
 {\normalsize\bfseries\color{tbbpurple}생각해 보기}\par\vspace{3pt}
 \begin{tbbitemize}
-  \item 기록 11-1의 프리필은 디코드 3.4토큰 시간에 500토큰 분량의 작업을 했다. L4의 121 TFLOPS를 기준으로 각 단계의 유효 FLOP 사용률을 계산하라. 루프라인 용어로 디코드의 나머지 \textasciitilde{}97\% 연산 용량이 어디로 갔는지 설명하라.
+  \item 터미널 기록 11-1의 프리필은 디코드 3.4토큰 시간에 500토큰 분량의 작업을 했다. L4의 121 TFLOPS를 기준으로 각 단계의 유효 FLOP 사용률을 계산하라. 루프라인 용어로 디코드의 나머지 \textasciitilde{}97\% 연산 용량이 어디로 갔는지 설명하라.
   \item 한 팀원은 "프롬프트를 줄여 TTFT를 낮추자"고 하고 다른 팀원은 "디코드보다 프리필을 먼저 받아 TTFT를 낮추자"고 한다. 각 제안은 누구의 어느 시계에 비용을 부과하는가? 두 번째 제안을 정식화하는 §11.4의 메커니즘은 무엇인가?
-  \item 제10장에서 배포한 INT8 변형(3 GB 가중치, 같은 GPU)을 대상으로 기록 11-1을 다시 계산하라. 어느 시계가 얼마나 개선되며, 다른 시계는 왜 거의 움직이지 않는가? 힌트: 프리필은 연산 병목이다.
+  \item 제10장에서 배포한 INT8 변형(3 GB 가중치, 같은 GPU)을 대상으로 터미널 기록 11-1을 다시 계산하라. 어느 시계가 얼마나 개선되며, 다른 시계는 왜 거의 움직이지 않는가? 힌트: 프리필은 연산 병목이다.
   \item L = λW로 전체 플릿을 계산하라. 동시 스트림 100개가 필요하고 W ≈ 4.4 s다. 제품이 감당할 수 있는 도착률은 얼마인가? 이제 평균 답변 길이를 두 배로 늘려라. 세 SLO 조항 중 무엇이 먼저 깨지며, 이를 해결하려면 무엇을 구매해야 하는가?
 \end{tbbitemize}
 \end{calloutbox}
@@ -177,7 +177,7 @@ per 4k conversation:  4096 x 112 KB           = 448.00 MiB   # !!
 # the binding resource the moment the model started talking back.
 \end{Verbatim}
 \end{terminalbox}
-\figcaption{기록 11-2  모델 카드에서 계산한 캐시. 사례 11-B의 448 MiB를 관찰이 아니라 도출했다. L4의 좌석 수는 13 GB 풀을 토큰당 112 KB로 나누는 문제다. 동시성이 메모리 수치가 되었다.}
+\figcaption{터미널 기록 11-2  모델 카드에서 계산한 캐시. 사례 11-B의 448 MiB를 관찰이 아니라 도출했다. L4의 좌석 수는 13 GB 풀을 토큰당 112 KB로 나누는 문제다. 동시성이 메모리 수치가 되었다.}
 
 \begin{tbbfigure}
   \adjustbox{max width=0.94\linewidth,max totalheight=0.46\textheight}{\includegraphics{figures/fig11-3_kvcache.png}}\\[3pt]
@@ -199,7 +199,7 @@ per 4k conversation:  4096 x 112 KB           = 448.00 MiB   # !!
 \begin{tbbitemize}
   \item 사례 11-B의 시간선을 정량적으로 재구성하라. 24 GB 카드에서 9.8 GB를 바닥으로 삼고 대화 \textasciitilde{}30개가 각각 \textasciitilde{}2 tokens/s씩 자란다. 실패할 시각을 예측한 뒤 실제 곡선이 더 울퉁불퉁한 이유를 설명하라. 힌트: 답변은 끝나고 사용자는 멈추며 새 입장이 도착한다.
   \item PM은 "모델이 지원하니까" 128k 컨텍스트 요금제를 원한다. 교재의 3B 모델에서 128k 대화 하나가 차지하는 KV 바이트, 배치 8의 단계별 트래픽, 퇴거되는 좌석 수로 비용을 계산하라. 이어 요금제의 가격 구조와 입장 규칙을 제안하라.
-  \item 기록 11-2의 좌석 수를 (a) 제10장에서 배포한 INT8 가중치, (b) 여기에 FP8 KV 캐시 추가, (c) 둘에 GQA→MQA(KV 헤드 1개)까지 적용한 경우에 대해 다시 계산하라. 어느 단일 변경이 가장 많은 좌석을 사며, 무엇에 §10.3의 게이트가 가장 시급한가?
+  \item 터미널 기록 11-2의 좌석 수를 (a) 제10장에서 배포한 INT8 가중치, (b) 여기에 FP8 KV 캐시 추가, (c) 둘에 GQA→MQA(KV 헤드 1개)까지 적용한 경우에 대해 다시 계산하라. 어느 단일 변경이 가장 많은 좌석을 사며, 무엇에 §10.3의 게이트가 가장 시급한가?
   \item 단계 비용 모델에 따르면 32k 문서 대화 하나를 짧은 대화 31개와 함께 배치하면 모두 느려진다. 큰 대화가 있을 때와 없을 때 각 스트림의 TPOT를 계산한 뒤 실제로 배포할 공정성 정책을 설계하라. 좌석별 KV 할당량, 별도 풀, 가격 책정을 고려할 수 있다.
   \item 제3장은 페이지 캐시를 "회수 가능한 밸러스트", 익명 메모리를 "필요"라고 설명했다. KV 캐시는 어느 쪽인가? 답을 바탕으로 메모리 압박에서 엔진이 웹 서버에는 불가능했던 어떤 작업을 할 수 있는지 설명하라. §11.4의 선점이 그 결론이다.
 \end{tbbitemize}
@@ -241,7 +241,7 @@ t+6:00         32         26         98 %           # waiting grows: TTFT now
 # your SLO breaks in regime 3 at the TTFT clause - almost never TPOT.
 \end{Verbatim}
 \end{terminalbox}
-\figcaption{기록 11-3  자체 메트릭으로 관찰한 연속 배치. running은 KV 풀의 좌석 수까지 올라간 뒤 멈추고, 풀이 차는 순간 waiting이 나타난다. 부하에서 실패하는 순서는 언제나 같다. 제7장의 하키 스틱 예측대로 대기열 때문에 TTFT가 먼저 무너진다.}
+\figcaption{터미널 기록 11-3  자체 메트릭으로 관찰한 연속 배치. running은 KV 풀의 좌석 수까지 올라간 뒤 멈추고, 풀이 차는 순간 waiting이 나타난다. 부하에서 실패하는 순서는 언제나 같다. 제7장의 하키 스틱 예측대로 대기열 때문에 TTFT가 먼저 무너진다.}
 
 \subsection*{조절점은 무엇이 되었는가 — 9주 차 스윕의 변환}
 
@@ -283,7 +283,7 @@ INFO     Avg generation throughput: 691.2 tokens/s,
 # quantize the weights, shrink max-model-len, or buy the bigger card.
 \end{Verbatim}
 \end{terminalbox}
-\figcaption{기록 11-4  실제 선점. WARNING은 설계가 작동한다는 뜻이다. 제3장의 OOM killer에는 더 부드러운 선택지가 없었지만 블록 관리자는 퇴거, 대기, 재프리필을 할 수 있다. 카운터를 활력 징후처럼 읽어라. 0에 가까우면 탄력적인 상태이고 계속 오르면 용량이 부족하다.}
+\figcaption{터미널 기록 11-4  실제 선점. WARNING은 설계가 작동한다는 뜻이다. 제3장의 OOM killer에는 더 부드러운 선택지가 없었지만 블록 관리자는 퇴거, 대기, 재프리필을 할 수 있다. 카운터를 활력 징후처럼 읽어라. 0에 가까우면 탄력적인 상태이고 계속 오르면 용량이 부족하다.}
 
 정직하게 한계를 짚어 보자. 연속 배치는 \textit{길이가 제각각인 상황의 처리량}을 최적화한다. §11.3의 대역폭 계산을 폐기하지 않는다. 승객들이 메모리 버스 하나를 공유하므로 배치 1에서 32로 가면 TPOT는 여전히 \textasciitilde{}3× 나빠진다. \textbf{동승자가 없는} 워크로드에도 도움이 되지 않는다. 사용자 한 명의 에이전트 루프가 영원히 배치 1이라면 메모리 벽의 포로로 남는다. §11.5의 추측 디코딩이 바로 이 경우를 위해 존재한다. 엔진이 주는 선물은 더 좁지만 엄청나다. \textit{누군가 기다리는 동안 비용을 지불한 좌석이 절대 비지 않게} 보장한다. 좌석이 충분히 저렴한지는 여전히 제10장과 제12장의 몫이다.
 
@@ -292,7 +292,7 @@ INFO     Avg generation throughput: 691.2 tokens/s,
 \begin{tbbitemize}
   \item 답변 길이가 32/180/60/210 tokens인 정적 배치(static batching) 4를 생각하라(그림 11-4). 정확한 좌석-단계 낭비와 10단계에 도착한 요청의 TTFT를 계산하고, 연속 배치에서 두 수치를 다시 계산하라. 이어 입력 길이별 버킷팅(제10장 규칙 ③)이 이 문제를 전혀 해결하지 못하는 이유를 설명하라.
   \item 2,000토큰 프롬프트에 chunk = 512 tokens인 청크 프리필을 적용한다. decode step ≈ 21 ms, prefill chunk ≈ 55 ms를 함께 스케줄링할 때 새 승객에게 추가되는 TTFT와 네 혼합 단계 동안 기존 승객의 TPOT를 추정하라. 이제 반대편을 주장하라. 언제 의도적으로 전체 프롬프트 프리필을 실행하겠는가? 힌트: 전용 프리필 레플리카는 상자 11-1의 DistServe 아이디어다.
-  \item 기록 11-3의 구간 3은 running이 32에 고정되고 waiting=26인 상태다. W ≈ 4.4 s에서 L = λW를 사용해 도착률, 대기열 증가율, 26번째 대기자의 TTFT를 추정하라. 실패를 보고하는 SLO 조항은 무엇이며, 제12장은 어떤 해결책을 판매하는가?
+  \item 터미널 기록 11-3의 구간 3은 running이 32에 고정되고 waiting=26인 상태다. W ≈ 4.4 s에서 L = λW를 사용해 도착률, 대기열 증가율, 26번째 대기자의 TTFT를 추정하라. 실패를 보고하는 SLO 조항은 무엇이며, 제12장은 어떤 해결책을 판매하는가?
   \item vLLM은 퇴거 후 재계산으로 선점한다. 3,000토큰 대화를 선점할 때 (a) 낭비되는 프리필 연산, (b) 피해자의 다음 턴 TTFT, (c) 공정성 측면에서 비용을 계산하라. 가장 최근, 가장 긴, 재계산 비용이 가장 싼 시퀀스 중 누구를 선점할지 정책을 설계하고 피해자에게 정당화하라.
 \end{tbbitemize}
 \end{calloutbox}
@@ -318,7 +318,7 @@ INFO     Avg generation throughput: 691.2 tokens/s,
 
 \subsection*{기관별로 살펴보는 vLLM — 추측이라는 수단}
 
-이 장의 내용을 조립하면 vLLM의 블록 다이어그램(그림 11-6)이 나온다. 제9장의 여섯 기관 중 두 기관을 이식한 구조다. \textbf{배처}는 §11.4의 반복 스케줄러다. \textbf{모델 저장소}의 핫 경로에는 §11.5의 테이블, 참조 횟수, 선점을 실행하는 VRAM 속 "운영체제"인 블록 관리자가 생겼다. 주변은 익숙하다. OpenAI 호환 프런트 도어가 SSE로 통신하므로 제6장의 클라이언트, LB, 타임아웃 교훈이 그대로 적용된다. 제6장의 safetensors 로딩과 기록 11-3에서 이미 이름을 읽은 Prometheus 메트릭도 있다. 실행기 안에서는 제10장의 두 기법이 제값을 한다. 디코드 단계는 \textbf{CUDA Graphs}로 캡처한다. 3B 디코드 단계는 21 ms 예산 안에서 수백 개의 작은 커널을 실행하므로 실행 오버헤드가 중요한 적이다. 그래프가 전체 단계를 제출 한 번으로 재생해 제10장의 \textit{a}를 빌드가 아니라 런타임에서 줄인다. 가중치 슬롯은 제10장에서 그룹별 스케일 용어를 배운 \textbf{GPTQ/AWQ INT4} 산출물을 받는다. 교재 모델은 INT4에서 \textasciitilde{}1.9 GB이므로 배치 1 단계 트래픽이 \textasciitilde{}2.4 GB → \textbf{\textasciitilde{}8 ms → tokens/s 2.5×}로 줄고, KV 풀은 4 GB 넓어져 4k 좌석이 ≈ 9개 늘어난다. 게이트를 거친 산출물 하나가 두 시계와 좌석 수를 모두 개선한다. 퍼플렉시티나 작업 지표를 명시한 허용 오차와 비교하는 §10.3의 게이트는 그대로 적용된다.
+이 장의 내용을 조립하면 vLLM의 블록 다이어그램(그림 11-6)이 나온다. 제9장의 여섯 기관 중 두 기관을 이식한 구조다. \textbf{배처}는 §11.4의 반복 스케줄러다. \textbf{모델 저장소}의 핫 경로에는 §11.5의 테이블, 참조 횟수, 선점을 실행하는 VRAM 속 "운영체제"인 블록 관리자가 생겼다. 주변은 익숙하다. OpenAI 호환 프런트 도어가 SSE로 통신하므로 제6장의 클라이언트, LB, 타임아웃 교훈이 그대로 적용된다. 제6장의 safetensors 로딩과 터미널 기록 11-3에서 이미 이름을 읽은 Prometheus 메트릭도 있다. 실행기 안에서는 제10장의 두 기법이 제값을 한다. 디코드 단계는 \textbf{CUDA Graphs}로 캡처한다. 3B 디코드 단계는 21 ms 예산 안에서 수백 개의 작은 커널을 실행하므로 실행 오버헤드가 중요한 적이다. 그래프가 전체 단계를 제출 한 번으로 재생해 제10장의 \textit{a}를 빌드가 아니라 런타임에서 줄인다. 가중치 슬롯은 제10장에서 그룹별 스케일 용어를 배운 \textbf{GPTQ/AWQ INT4} 산출물을 받는다. 교재 모델은 INT4에서 \textasciitilde{}1.9 GB이므로 배치 1 단계 트래픽이 \textasciitilde{}2.4 GB → \textbf{\textasciitilde{}8 ms → tokens/s 2.5×}로 줄고, KV 풀은 4 GB 넓어져 4k 좌석이 ≈ 9개 늘어난다. 게이트를 거친 산출물 하나가 두 시계와 좌석 수를 모두 개선한다. 퍼플렉시티나 작업 지표를 명시한 허용 오차와 비교하는 §10.3의 게이트는 그대로 적용된다.
 
 실행기의 한 줄은 별도 문단을 쓸 가치가 있다. 제10장의 마지막 약속을 갚고 §11.2의 "본질적으로 직렬"이라는 규칙을 조금 휘게 하는 \textbf{추측 디코딩}이다. 핵심은 메모리 벽의 비대칭에서 차익을 얻는 것이다. 디코드 단계의 20 ms는 토큰 하나의 \textit{대역폭}을 사지만 수백 토큰 분량의 \textit{FLOP}도 함께 산다. AI ≈ 1이고 능선이 400이므로 연산 비용은 이미 냈지만 유휴 상태다. 아주 작은 \textbf{초안 모델(draft model)}(예: \textasciitilde{}160M, \textasciitilde{}1 ms/token)이 k = 4 tokens를 저렴하게 추측하게 한 뒤, 목표 모델이 \textbf{네 개를 한 패스에서 모두 검증}하게 한다. 토큰 \textit{하나}를 생성할 때와 같은 6 GB를 스트리밍한다. 가장 긴 올바른 접두사를 받아들이고 표본 추출을 보정해 출력 분포가 \textit{증명 가능하게 동일}하도록 만든다. 품질 절충이 아니라 시스템 기법이다. 일반 텍스트에서는 네 개 중 \textasciitilde{}3개가 살아남는다. 유효 비용은 (4 × 1 ms 초안) + (21.5 ms 검증 한 번) ≈ \textasciitilde{}3 tokens당 25.5 ms이므로 \textbf{\textasciitilde{}8.5 ms/token, 배치 1에서 TPOT 2.5× 개선}이다. 전부 낭비될 뻔한 FLOP으로 샀다. 정직한 작은 글씨도 있다. 어렵거나 특이한 텍스트에서는 수락률이 무너져 초안 비용은 내면서 속도 향상 → 1×가 된다. 초안 모델도 VRAM을 차지하며, 배치가 높을수록 유휴 FLOP 보조금이 줄어든다. 그래서 추측은 \textit{단일 사용자 에이전트 루프}의 수단이고, 다수 사용자를 위한 연속 배치와 대체로 상호 보완적이다.
 
@@ -367,11 +367,11 @@ vLLM 주변의 선택지(그림 11-6 오른쪽)를 제9장의 방식으로 간�
 \subsection*{일곱 단계}
 
 \begin{tbbitemize}
-  \item \textbf{① 서빙한다.} \code{vllm serve Qwen/\allowbreak Qwen2.5-1.5B-Instruct --max-model-len 4096 --gpu-memory-utilization 0.90}을 실행한다. 시스템 엔지니어처럼 부팅 로그를 읽는다. 가중치 로드(제6장의 범위 GET), CUDA 그래프 캡처(제10장의 a), \textbf{풀이 보유한 KV 블록 수}를 출력하는 줄을 확인한다. 기록 11-2의 계산을 엔진이 대신 해 준 결과다. 시작에는 1분 이상 걸리므로 제5장의 준비 상태 프로브 예산을 떠올려야 한다.
-  \item \textbf{② 하나를 손으로 스트리밍한다.} 기록 11-5처럼 \code{"stream": true}와 \code{curl -N}을 사용하고 SSE 청크가 도착하는 모습을 \textit{지켜본다}. 잠깐 숨을 고른 뒤 첫 청크(TTFT)가 오고 이어 일정한 가랑비(TPOT)가 내린다. 어떤 하네스(harness)가 추상화하기 전에 두 시계를 직접 눈으로 본다.
+  \item \textbf{① 서빙한다.} \code{vllm serve Qwen/\allowbreak Qwen2.5-1.5B-Instruct --max-model-len 4096 --gpu-memory-utilization 0.90}을 실행한다. 시스템 엔지니어처럼 부팅 로그를 읽는다. 가중치 로드(제6장의 범위 GET), CUDA 그래프 캡처(제10장의 a), \textbf{풀이 보유한 KV 블록 수}를 출력하는 줄을 확인한다. 터미널 기록 11-2의 계산을 엔진이 대신 해 준 결과다. 시작에는 1분 이상 걸리므로 제5장의 준비 상태 프로브 예산을 떠올려야 한다.
+  \item \textbf{② 하나를 손으로 스트리밍한다.} 터미널 기록 11-5처럼 \code{"stream": true}와 \code{curl -N}을 사용하고 SSE 청크가 도착하는 모습을 \textit{지켜본다}. 잠깐 숨을 고른 뒤 첫 청크(TTFT)가 오고 이어 일정한 가랑비(TPOT)가 내린다. 어떤 하네스(harness)가 추상화하기 전에 두 시계를 직접 눈으로 본다.
   \item \textbf{③ 직접 캐시 크기를 계산한다.} 모델 카드에 맞춰 kv\_math.py를 실행한다. 28개 계층에 KV 헤드 2개 × 128이므로 작은 모델의 캐시는 \textasciitilde{}28 KB/token으로 3B의 4분의 1이다. ①단계에서 엔진이 출력한 블록 수를 예측하고 10\% 안에서 맞춘다. 틀리더라도 실습에서 가장 저렴한 교훈이다. 빠뜨린 항을 찾으면 되며 보통 활성값이다.
   \item \textbf{④ 토큰을 인식하는 방식으로 부하를 건다.} 제공된 비동기 하네스는 c = 1 / 8 / 32 / 64개의 동시 스트림을 연다. 500토큰 프롬프트와 \textasciitilde{}200토큰 답변을 사용하고 길이를 통제하기 위해 \code{ignore\_eos}를 적용한다. 이 사실을 보고서에 명시해야 한다. 요청 지연 시간이 아니라 \textbf{스트림별 TTFT와 TPOT 백분위수}를 기록한다. Locust의 요청 수준 관점은 구조적으로 이 상황을 볼 수 없다. 하네스는 aiohttp 50줄이고, 이를 읽는 것도 실습에 포함된다.
-  \item \textbf{⑤ ④가 실행되는 동안 집계를 지켜본다.} 기록 11-3의 세 구간을 실시간으로 재현한다. \code{running}은 좌석 수까지 올라가고, 풀이 차면 \code{waiting}이 나타나며, \code{gpu\_cache\_usage\_perc}는 높은 값에 고정된다. \textbf{높은 값에 고정되는 것은 정상}이다. 제3장의 페이지 캐시 교훈을 GPU에 적용한 모습이다. TTFT p99가 느끼는 것은 캐시가 아니라 대기열이다.
+  \item \textbf{⑤ ④가 실행되는 동안 집계를 지켜본다.} 터미널 기록 11-3의 세 구간을 실시간으로 재현한다. \code{running}은 좌석 수까지 올라가고, 풀이 차면 \code{waiting}이 나타나며, \code{gpu\_cache\_usage\_perc}는 높은 값에 고정된다. \textbf{높은 값에 고정되는 것은 정상}이다. 제3장의 페이지 캐시 교훈을 GPU에 적용한 모습이다. TTFT p99가 느끼는 것은 캐시가 아니라 대기열이다.
   \item \textbf{⑥ 통과 의례를 수집한다.} 앞에 60초 유휴 LB나 프록시를 두거나 실습 자료의 nginx 설정을 사용해 \textbf{정확히 60.0 s에 끊기는 스트림}을 재현한다. SSE keep-alive 주석을 추가하고 유휴 타임아웃을 높여 고친다. 제6장의 빚을 직접 갚는 과정이다. 선택 사항이지만 같은 모델의 \textbf{AWQ INT4} 빌드로 스윕 한 행을 반복하고 두 TPOT를 나란히 비교하기를 권장한다. 보고서에서는 이 비교 옆에 §10.3의 게이트 논의를 넣어야 한다.
   \item \textbf{⑦ 보고서와 문장을 작성한다.} 그림 11-7의 표에는 각 c에서 TTFT p50/p99, 스트림별 tok/s, 집계 tok/s를 넣는다. 이어 형태의 원인을 밝히는 문단 하나를 쓴다. c가 증가할수록 스트림별 TPOT는 어디로 갔는가? TTFT의 무릎점은 어디에 나타났으며 왜 대기열 때문인가? 각 조항을 뒷받침하는 측정 근거와 함께 프로젝트의 SLO 문장을 다시 쓴다. 추정 → 측정 → 최적화 → \textbf{재계약}으로 이어지며, 제안서의 비용 이야기가 이제 스트림 단위로 말한다.
 \end{tbbitemize}
@@ -396,7 +396,7 @@ data: [DONE]
 # you have now SEEN both clocks. everything else is percentiles.
 \end{Verbatim}
 \end{terminalbox}
-\figcaption{기록 11-5  손으로 서빙하고 스트리밍하기. 부팅 로그는 KV 블록 수를 알려 주므로 직접 계산한 결과와 맞춰야 한다. SSE 스트림은 TTFT와 TPOT를 물리적으로 느끼게 한다. 한 번 숨을 고른 뒤 읽기보다 빠른 가랑비가 이어진다.}
+\figcaption{터미널 기록 11-5  손으로 서빙하고 스트리밍하기. 부팅 로그는 KV 블록 수를 알려 주므로 직접 계산한 결과와 맞춰야 한다. SSE 스트림은 TTFT와 TPOT를 물리적으로 느끼게 한다. 한 번 숨을 고른 뒤 읽기보다 빠른 가랑비가 이어진다.}
 
 \begin{terminalbox}
 \begin{Verbatim}[breaklines=true,breakanywhere=true,fontsize=\small,formatcom=\color{tbbtermfg},codes=\tbbcodeactive]
@@ -412,7 +412,7 @@ $ python sweep.py --url :8000 --conc 1 8 32 64 --prompt-tok 500 --gen-tok 200
 # now write the SLO sentence your own numbers can sign.
 \end{Verbatim}
 \end{terminalbox}
-\figcaption{기록 11-6  토큰 인식 스윕. 9주 차 방법을 두 시계 너비로 확장했다. 무릎점은 TTFT p99의 대기열에, 고원은 집계 tokens/s의 메모리 버스에 있다. SLO 문장은 홍보 자료가 아니라 표에서 나온다.}
+\figcaption{터미널 기록 11-6  토큰 인식 스윕. 9주 차 방법을 두 시계 너비로 확장했다. 무릎점은 TTFT p99의 대기열에, 고원은 집계 tokens/s의 메모리 버스에 있다. SLO 문장은 홍보 자료가 아니라 표에서 나온다.}
 
 \begin{calloutbox}{tbbred}{tbbxFEF2F2}
 {\normalsize\bfseries\color{tbbx991B1B}상자 11-2  보고서의 위험 신호 — 스트리밍판 채점자 점검표}\par\vspace{3pt}
@@ -434,7 +434,7 @@ $ python sweep.py --url :8000 --conc 1 8 32 64 --prompt-tok 500 --gen-tok 200
 {\normalsize\bfseries\color{tbbpurple}생각해 보기}\par\vspace{3pt}
 \begin{tbbitemize}
   \item ③단계의 예측이 엔진이 출력한 블록 수와 22\% 차이 났다. 가능성이 큰 원인 세 가지를 활성값 예비 공간, CUDA 그래프 메모리, 캐시 dtype 순으로 나열하고, 각각을 분리해 확인할 플래그 하나짜리 실험을 제시하라.
-  \item 기록 11-6에서 c=1에서 c=32로 갈 때 TPOT p50은 21.4 → 34.5 ms로 늘었다. §11.3의 최악 예측인 3×보다 작다. 이번 실습의 컨텍스트가 4k가 아니라 500+200 tokens라는 점이 KV 항을 작게 만드는 이유를 설명하라. T4 수치가 L4 계산 예시와 같은 형태가 되려면 컨텍스트 길이가 얼마여야 하는가?
+  \item 터미널 기록 11-6에서 c=1에서 c=32로 갈 때 TPOT p50은 21.4 → 34.5 ms로 늘었다. §11.3의 최악 예측인 3×보다 작다. 이번 실습의 컨텍스트가 4k가 아니라 500+200 tokens라는 점이 KV 항을 작게 만드는 이유를 설명하라. T4 수치가 L4 계산 예시와 같은 형태가 되려면 컨텍스트 길이가 얼마여야 하는가?
   \item 플릿으로 변환하라. T4는 c=32에서 집계 928 tok/s, TTFT p99 = 2.1 s로 측정되었다. 제품에는 TTFT p99 ≤ 500 ms에서 동시 스트림 100개가 필요하다. L = λW와 스윕을 사용해 레플리카 수를 구하고, 용량과 지연 시간 중 어느 조항이 그 수를 강제했는지 설명하라.
   \item AWQ 행에서 TPOT는 21.4 → 13.1 ms지만 TTFT p50은 0.19 → 0.17 s로 거의 움직이지 않았다. §11.2의 두 장치를 이용해 두 델타를 설명하라. 모델 저장소에서 AWQ 빌드와 함께 두어야 할 §10.3의 산출물 규율 항목도 제시하라.
 \end{tbbitemize}
@@ -462,7 +462,7 @@ $ python sweep.py --url :8000 --conc 1 8 32 64 --prompt-tok 500 --gen-tok 200
 
 \qitem{10}{\textbf{연속 배치(Orca)는 요청이 아니라 반복을 스케줄링한다.} \textasciitilde{}20 ms 단계마다 끝난 시퀀스를 퇴거하고 KV가 허용하는 만큼 대기 시퀀스를 입장시킨 뒤 모두를 진행한다. 배치는 집단이 되며 누군가 기다리는 동안 좌석이 쉬지 않는다. 다음 출발까지 한 단계뿐이므로 max\_queue\_delay는 사라진다.}
 
-\qitem{11}{\textbf{두 시계는 엔진 하나 안에서 싸운다.} 전체 프롬프트 프리필은 디코더 30개를 멈춰 TPOT를 끊기게 한다. 청크 프리필은 이를 단계에 나누며 max\_num\_batched\_tokens가 TTFT↔TPOT 다이얼이다. 부하 실패는 언제나 대기열부터 시작한다. 기록 11-3의 세 구간처럼 TPOT는 완만하게 나빠지는 동안 TTFT p99가 무너진다.}
+\qitem{11}{\textbf{두 시계는 엔진 하나 안에서 싸운다.} 전체 프롬프트 프리필은 디코더 30개를 멈춰 TPOT를 끊기게 한다. 청크 프리필은 이를 단계에 나누며 max\_num\_batched\_tokens가 TTFT↔TPOT 다이얼이다. 부하 실패는 언제나 대기열부터 시작한다. 터미널 기록 11-3의 세 구간처럼 TPOT는 완만하게 나빠지는 동안 TTFT p99가 무너진다.}
 
 \qitem{12}{\textbf{PagedAttention은 캐시용 가상 메모리다.} 연속 최대 길이 슬랩은 풀의 60–80\%를 낭비했다(SOSP 2023 측정). 16토큰 블록 + 시퀀스별 블록 테이블은 낭비를 4\% 아래로 줄였다. 회수한 낭비가 좌석과 처리량으로 누적되어 당시 가장 강한 시스템보다 2–4×, 단순 서빙보다 14–24× 높은 성능을 냈다. 한 세대 최고의 시스템 논문이 메모리 할당기에 관한 것이었다.}
 
@@ -570,7 +570,7 @@ $ python sweep.py --url :8000 --conc 1 8 32 64 --prompt-tok 500 --gen-tok 200
 
 \qitem{4}{\textbf{③} 반복 수준 스케줄링은 \textasciitilde{}20 ms 토큰 경계마다 퇴거/입장/진행한다. ①은 입력을 다룬 제10장의 패딩 이야기이고 여기서는 제각각인 출력이 문제다. (§11.4)}
 
-\qitem{5}{\textbf{②} 풀의 좌석이 입장을 제한한다. 과부하는 num\_requests\_waiting에 쌓이고 TTFT가 대기열을 물려받는다(L = λW). TPOT는 배치와 함께 완만하게 나빠지지만 대기열은 폭발한다. 기록 11-3의 구간 3이다. (§11.4)}
+\qitem{5}{\textbf{②} 풀의 좌석이 입장을 제한한다. 과부하는 num\_requests\_waiting에 쌓이고 TTFT가 대기열을 물려받는다(L = λW). TPOT는 배치와 함께 완만하게 나빠지지만 대기열은 폭발한다. 터미널 기록 11-3의 구간 3이다. (§11.4)}
 
 \qitem{6}{\textbf{②} 고정 블록 + 변환 테이블이 페이징이며 단편화는 마지막 블록 하나로 줄어든다(60–80\%에서 <4\%). 압축도 오프로딩도 아닌 간접 참조다. (§11.5)}
 
@@ -613,7 +613,7 @@ $ python sweep.py --url :8000 --conc 1 8 32 64 --prompt-tok 500 --gen-tok 200
   \item \textbf{N. Shazeer, "Fast Transformer Decoding: One Write-Head Is All You Need" (2019) · J. Ainslie et al., "GQA" (2023)} — §11.3의 바이트를 아키텍처 측면에서 공격한다. MQA의 질문과 GQA의 절충을 통해 모델 카드에 "KV 헤드 8개"라고 적힌 이유를 설명한다.
   \item \textbf{Y. Leviathan et al., "Fast Inference from Transformers via Speculative Decoding" (2023) · C. Chen et al., "Accelerating LLM Decoding with Speculative Sampling" (2023)} — 초안 후 검증 논문으로, 거부 표본 추출을 적용해 분포가 유지된다는 증명도 포함한다.
   \item \textbf{[12주 차] Y. Zhong et al., "DistServe" (OSDI 2024)} — 프리필–디코드 분리를 플릿 설계로 발전시킨다. 상자 11-1의 첫 항목을 GPU당 유효 처리량 계산으로 확장한 연구다.
-  \item \textbf{vLLM docs — "Engine Arguments" and "Production Metrics"} — 실습의 조절점(max\_num\_batched\_tokens, gpu\_memory\_utilization)과 기록 11-3에서 읽은 모든 /metrics 항목을 공식적으로 설명한다.
+  \item \textbf{vLLM docs — "Engine Arguments" and "Production Metrics"} — 실습의 조절점(max\_num\_batched\_tokens, gpu\_memory\_utilization)과 터미널 기록 11-3에서 읽은 모든 /metrics 항목을 공식적으로 설명한다.
   \item \textbf{[이번 주, 재미] 좋아하는 채팅 UI의 브라우저 네트워크 탭} — SSE 프레임이 도착하는 모습을 보고 첫 프레임을 초시계로 재어 보자. 바깥에서 누군가의 TTFT SLO를 감사하는 셈이며, 이번 주가 끝나면 그들의 대시보드가 무엇을 말하는지도 정확히 알 수 있다.
 \end{tbbitemize}
 

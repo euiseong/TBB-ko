@@ -220,7 +220,7 @@ $ grep -m1 -c -E "vmx|svm" /proc/cpuinfo
 # the illusion, by default, refuses to nest.
 \end{Verbatim}
 \end{terminalbox}
-\figcaption{기록 2-1  VT-x 찾기. 물리 노트북은 vmx/svm을 알리고 /dev/kvm을 공개한다. 임대한 VM 안에서는 하이퍼바이저가 이 기능을 마스킹한다. 곧 만날 VMCS가 선택한 CPUID 비트 하나다.}
+\figcaption{터미널 기록 2-1  VT-x 찾기. 물리 노트북은 vmx/svm을 알리고 /dev/kvm을 공개한다. 임대한 VM 안에서는 하이퍼바이저가 이 기능을 마스킹한다. 곧 만날 VMCS가 선택한 CPUID 비트 하나다.}
 
 \subsection*{두 세계: VMX root 모드와 non-root 모드}
 
@@ -306,7 +306,7 @@ $ ps -o pid,psr,pcpu,comm -Lp 9114 | grep CPU  # psr = core hosting it
 # renice it, pin it, cgroup it - everything Linux does to threads applies.
 \end{Verbatim}
 \end{terminalbox}
-\figcaption{기록 2-2  호스트에서 본 게스트의 "프로세서" 네 개. QEMU 프로세스 하나 안에 있는 스케줄 가능한 스레드 네 개다. 이후의 오버커밋, 스틸 타임, 전용 코어는 모두 평범한 스레드 스케줄링이 의상을 입은 것이다.}
+\figcaption{터미널 기록 2-2  호스트에서 본 게스트의 "프로세서" 네 개. QEMU 프로세스 하나 안에 있는 스케줄 가능한 스레드 네 개다. 이후의 오버커밋, 스틸 타임, 전용 코어는 모두 평범한 스레드 스케줄링이 의상을 입은 것이다.}
 
 이 한 가지 사실에서 운영 중 만나게 될 여러 클라우드 현상이 나온다.
 
@@ -331,7 +331,7 @@ cpu  184023 340 44522 830112 902 0 4211 267001 0 0
 #                                        ^^^^^^ jiffies stolen since boot
 \end{Verbatim}
 \end{terminalbox}
-\figcaption{기록 2-3  현장에서 붙잡은 스틸 타임. 게스트는 실행 가능했지만 호스트 스케줄러가 다른 테넌트를 실행했고, 요청은 볼 수 없는 슬라이스를 기다렸다. 깨끗한 CPU 그래프와 함께 p99가 급증한다면 한 계층 아래에 답이 있다.}
+\figcaption{터미널 기록 2-3  현장에서 붙잡은 스틸 타임. 게스트는 실행 가능했지만 호스트 스케줄러가 다른 테넌트를 실행했고, 요청은 볼 수 없는 슬라이스를 기다렸다. 깨끗한 CPU 그래프와 함께 p99가 급증한다면 한 계층 아래에 답이 있다.}
 
 \subsection*{장치 문제와 virtio의 정직한 답}
 
@@ -458,7 +458,7 @@ Tesla T4, 550.54.15, 16384 MiB
 # the one component the hypervisor did not fake. how? and why not?
 \end{Verbatim}
 \end{terminalbox}
-\figcaption{기록 2-4  환상 속의 예외. 디스크는 virtio, 시계는 kvm-clock, CPU 모델은 메뉴에서 고른 것이지만 T4는 패스스루된 물리 실리콘이다. 이 하위 절에서는 그 방법(VFIO + IOMMU)과 대가(카드당 테넌트 하나)를 설명한다.}
+\figcaption{터미널 기록 2-4  환상 속의 예외. 디스크는 virtio, 시계는 kvm-clock, CPU 모델은 메뉴에서 고른 것이지만 T4는 패스스루된 물리 실리콘이다. 이 하위 절에서는 그 방법(VFIO + IOMMU)과 대가(카드당 테넌트 하나)를 설명한다.}
 
 이번 주 g4dn을 시작했을 때 \code{nvidia-smi}에 보이는 T4는 에뮬레이션이나 프록시가 아니라 \textbf{물리 카드}다. 메커니즘은 \textbf{PCIe 패스스루}다. 호스트가 Linux VFIO 프레임워크를 통해 장치를 자신에게서 분리해 게스트에 매핑한다. 게스트는 실제 NVIDIA 드라이버를 로드하고 실제 실리콘과 통신한다. 이를 가능하게 하는 하드웨어는 표 2-1의 \textbf{IOMMU}(Intel VT-d / AMD-Vi)다. GPU는 메모리를 직접 읽고 쓰는 DMA 엔진이므로, 통제되지 않은 DMA 엔진을 테넌트에 넘기면 호스트 전체를 읽을 수 있다. IOMMU는 장치에 자체 주소 변환을 제공한다. 게스트 메모리 접근이 EPT를 통과하듯 DMA 주소도 하이퍼바이저가 제어하는 테이블을 통과하므로, GPU는 자기 게스트의 페이지만 건드릴 수 있다. 패스스루 덕분에 클라우드 GPU는 네이티브에 가까운 성능을 낸다. 설정 후 데이터 경로에는 하이퍼바이저가 전혀 관여하지 않는다. 한계도 마찬가지로 구조적이다. \textbf{할당 단위가 물리 GPU 하나 전체}다. 테넌트 하나, 카드 하나이므로 중재할 것이 없다. (VM이 호스트에 고정되기도 한다. 패스스루 장치가 있으면 라이브 마이그레이션이 불가능하며, 이는 GPU 인스턴스가 유지보수 때 이동되지 않고 중단되는 이유 중 하나다.)
 
@@ -564,7 +564,7 @@ GPU 할당량은 일찍 요청한다. 승인에 몇 시간이 걸릴 수 있다.
 
 \qitem{9}{\textbf{Firecracker}는 서버리스 시대의 답이다. KVM은 유지하고 장치 박물관은 없앤다. <125 ms 부팅, <5 MB 오버헤드, 호스트당 150 microVMs/s로, 프로세스처럼 동작하며 Lambda와 Fargate를 실행하는 VM이다. 12주 차에 주는 교훈은 환경이 더는 콜드 스타트 병목이 아니며 이미지, 가중치, GPU 상태가 병목이라는 것이다.}
 
-\qitem{10}{\textbf{GPU는 고전적 가상화에 저항하며} VT-x에 해당하는 기능이 없다. 따라서 클라우드는 카드 전체를 \textbf{PCIe 패스스루}한다(IOMMU/VFIO 사용, 네이티브에 가까운 성능, 공유 불가, 기록 2-4의 "가짜 머신 안의 진짜 카드"). 공유에는 \textbf{시간 분할/vGPU}(소프트웨어 공정성), \textbf{MPS}(함께 배치한 자체 워크로드), \textbf{MIG}(하드웨어 파티션, 최대 7개 격리 인스턴스와 조각별 메모리 및 예측 가능한 p99, GPU의 VT-x 순간)를 사용한다.}
+\qitem{10}{\textbf{GPU는 고전적 가상화에 저항하며} VT-x에 해당하는 기능이 없다. 따라서 클라우드는 카드 전체를 \textbf{PCIe 패스스루}한다(IOMMU/VFIO 사용, 네이티브에 가까운 성능, 공유 불가, 터미널 기록 2-4의 "가짜 머신 안의 진짜 카드"). 공유에는 \textbf{시간 분할/vGPU}(소프트웨어 공정성), \textbf{MPS}(함께 배치한 자체 워크로드), \textbf{MIG}(하드웨어 파티션, 최대 7개 격리 인스턴스와 조각별 메모리 및 예측 가능한 p99, GPU의 VT-x 순간)를 사용한다.}
 
 \qitem{11}{\textbf{서버군 표(표 2-3)는 의사 결정 도구다.} 추론용 T4/L4/A10G의 \textasciitilde{}\$0.5–1.0/hr부터 GPU당 수 달러인 A100/H100까지 제시한다. "클수록 안전하다"는 목록으로 읽지 말고, 제1장의 결정적인 제약 차원(모델이 메모리에 들어가면서 SLO도 충족하는 \textit{가장 저렴한} 카드는 무엇인가?)과 사용률 관점으로 읽어야 한다.}
 
@@ -671,7 +671,7 @@ GPU 할당량은 일찍 요청한다. 승인에 몇 시간이 걸릴 수 있다.
 
 \qitem{6}{\textbf{③} MIG만이 SM, L2, DRAM 등 실리콘 자체를 나누어 인스턴스별 하드웨어급 QoS를 제공한다. 시간 분할과 MPS는 하드웨어 경계 없이 시간적으로 또는 동시에 공유한다. (§2.6)}
 
-\qitem{7}{\textbf{③} 사례 2-A의 증거(DMI 문자열, \code{systemd-detect-virt}, \code{kvm-clock})는 머신이 가상임을 입증한다. 기록 2-4는 그럼에도 GPU는 실제임을 보여 준다. VFIO/IOMMU를 통한 패스스루가 물리 카드를 게스트에 매핑한다. 가상 머신 안의 실제 장치는 모순이 아니라 의도한 결과다. (§2.1, §2.6)}
+\qitem{7}{\textbf{③} 사례 2-A의 증거(DMI 문자열, \code{systemd-detect-virt}, \code{kvm-clock})는 머신이 가상임을 입증한다. 터미널 기록 2-4는 그럼에도 GPU는 실제임을 보여 준다. VFIO/IOMMU를 통한 패스스루가 물리 카드를 게스트에 매핑한다. 가상 머신 안의 실제 장치는 모순이 아니라 의도한 결과다. (§2.1, §2.6)}
 
 \subsection*{B. 단답형}
 

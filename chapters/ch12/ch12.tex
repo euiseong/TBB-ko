@@ -135,7 +135,7 @@ spec:
 # scale on the queue users feel - not the CPU nobody uses.
 \end{Verbatim}
 \end{terminalbox}
-\figcaption{기록 12-1  실습의 ScaledObject. 15줄에 올바른 지표(vLLM 입장 대기열), 안전을 위한 바닥, 예산을 위한 상한, 올릴 때는 빠르고 내릴 때는 느린 비대칭 성향이 담긴다.}
+\figcaption{터미널 기록 12-1  실습의 ScaledObject. 15줄에 올바른 지표(vLLM 입장 대기열), 안전을 위한 바닥, 예산을 위한 상한, 올릴 때는 빠르고 내릴 때는 느린 비대칭 성향이 담긴다.}
 
 \subsection*{성향: 올릴 때는 빠르게, 내릴 때는 느리게}
 
@@ -143,7 +143,7 @@ spec:
 
 \subsection*{초시계: 반응 시간도 용량의 일부다}
 
-이제 수요일의 매복을 보자. 올바른 눈과 차분한 성향이 있어도 루프의 종단 간 반응 시간은 \textbf{T = 감지(≤15 s 지표 스크레이프) + 결정(≤15 s 루프 틱) + 프로비저닝(§12.3의 콜드 스타트: 따뜻한 노드의 포드 \textasciitilde{}150 s, GPU 노드까지 태어나야 하면 6–10 min)}이다. 정직한 경우에도 3분으로 보자. 그동안 \textit{기존} 플릿이 \textit{새} 수요를 흡수하고 대기열이 차이를 적분한다. 09:00의 파도는 좌석 64개에 제공되는 부하를 동시 스트림 64개에서 104개로 올린다. 초당 \textasciitilde{}9건의 턴 도착이 좌석을 찾지 못하고, Ready 시점에는 스트림 약 40개 분량의 수요가 대기열에 모인다. 기록 11-3의 구간 3과 정확히 같고 매일 아침 예약된 시각에 TTFT p99가 붉어진다. 세 가지 해결책을 적용할 순서대로 살펴보자. 볼 수 있는 피크에는 \textbf{예약 스케일링(scheduled scaling)}을 사용한다. 평일마다 09:00에 오르는 트래픽은 예측 문제가 아니라 달력 문제다. 08:40에 바닥을 4로 올리는 KEDA cron 트리거는 40분 × 레플리카 2개 ≈ \textbf{하루 \$1.07}의 비용으로 매복을 없앤다. 볼 수 없는 피크에는 \textbf{여유 용량}을 둔다. 대기 10개 대신 5개를 허용해 목표를 조금 넉넉히 잡거나 영업시간 동안 레플리카 하나를 더 유지하면(\textasciitilde{}\$50/mo) 대기열이 감지 + 탄생 시간을 버틸 시간을 산다. 마지막은 \textbf{탄생 자체를 줄이는 것}이며 다음 절 전체의 주제다. 효과 없는 방법은 루프가 더 빨라지기를 바라는 것이다. 150초 탄생 앞에서 1초 스크레이프(scrape) 간격은 매복을 더 정밀하게 측정할 뿐이다.
+이제 수요일의 매복을 보자. 올바른 눈과 차분한 성향이 있어도 루프의 종단 간 반응 시간은 \textbf{T = 감지(≤15 s 지표 스크레이프) + 결정(≤15 s 루프 틱) + 프로비저닝(§12.3의 콜드 스타트: 따뜻한 노드의 포드 \textasciitilde{}150 s, GPU 노드까지 태어나야 하면 6–10 min)}이다. 정직한 경우에도 3분으로 보자. 그동안 \textit{기존} 플릿이 \textit{새} 수요를 흡수하고 대기열이 차이를 적분한다. 09:00의 파도는 좌석 64개에 제공되는 부하를 동시 스트림 64개에서 104개로 올린다. 초당 \textasciitilde{}9건의 턴 도착이 좌석을 찾지 못하고, Ready 시점에는 스트림 약 40개 분량의 수요가 대기열에 모인다. 터미널 기록 11-3의 구간 3과 정확히 같고 매일 아침 예약된 시각에 TTFT p99가 붉어진다. 세 가지 해결책을 적용할 순서대로 살펴보자. 볼 수 있는 피크에는 \textbf{예약 스케일링(scheduled scaling)}을 사용한다. 평일마다 09:00에 오르는 트래픽은 예측 문제가 아니라 달력 문제다. 08:40에 바닥을 4로 올리는 KEDA cron 트리거는 40분 × 레플리카 2개 ≈ \textbf{하루 \$1.07}의 비용으로 매복을 없앤다. 볼 수 없는 피크에는 \textbf{여유 용량}을 둔다. 대기 10개 대신 5개를 허용해 목표를 조금 넉넉히 잡거나 영업시간 동안 레플리카 하나를 더 유지하면(\textasciitilde{}\$50/mo) 대기열이 감지 + 탄생 시간을 버틸 시간을 산다. 마지막은 \textbf{탄생 자체를 줄이는 것}이며 다음 절 전체의 주제다. 효과 없는 방법은 루프가 더 빨라지기를 바라는 것이다. 150초 탄생 앞에서 1초 스크레이프(scrape) 간격은 매복을 더 정밀하게 측정할 뿐이다.
 
 \begin{terminalbox}
 \begin{Verbatim}[breaklines=true,breakanywhere=true,fontsize=\small,formatcom=\color{tbbtermfg},codes=\tbbcodeactive]
@@ -160,14 +160,14 @@ TIME      TARGETS        REPLICAS   EVENT
 # for $1.07 of pre-warm. compare Exhibit 12-B's three red minutes.
 \end{Verbatim}
 \end{terminalbox}
-\figcaption{기록 12-2  파도를 견딘 결과. cron 트리거가 피크 전에 두 탄생 비용을 내고, 대기열 트리거가 곡선을 처리하며, 쿨다운이 차분하게 감소시킨다. 약 1달러로 사건 내내 SLO를 지킨다. 이 교재가 판매하는 가장 저렴한 보험이다.}
+\figcaption{터미널 기록 12-2  파도를 견딘 결과. cron 트리거가 피크 전에 두 탄생 비용을 내고, 대기열 트리거가 곡선을 처리하며, 쿨다운이 차분하게 감소시킨다. 약 1달러로 사건 내내 SLO를 지킨다. 이 교재가 판매하는 가장 저렴한 보험이다.}
 
 경계를 정직하게 밝히자. 앞의 모든 방법은 \textbf{프로비저닝된 노드 풀 안의 포드}를 스케일링한다. 원하는 포드 수가 노드 용량을 넘으면 \textbf{클러스터 오토스케일러}가 GPU \textit{장치}를 탄생시켜야 한다. 용량 찾기, 부팅, 드라이버 설치에 3–7분이 걸리며 때로는 "no capacity in zone"으로 끝난다. GPU 부족은 실제 날씨와 같고 제2장의 할당량 실습은 온화한 예고편이었다. 수치에서 운영 규칙이 나온다. \textbf{포드는 파도를 쫓고 노드는 예측을 따른다.} 하루의 노드 범위, 즉 계단의 최댓값을 미리 프로비저닝하고 그 안에서 포드 오토스케일링이 숨 쉬게 한다. 노드 오토스케일링은 느린 하루의 조수로 다뤄야 하며 09:00 파도와 TTFT 조항 사이에 세워서는 안 된다.
 
 \begin{calloutbox}{tbbpurple}{tbbpurplefill}
 {\normalsize\bfseries\color{tbbpurple}생각해 보기}\par\vspace{3pt}
 \begin{tbbitemize}
-  \item 기록 11-3의 구간 3(running 32, waiting 26, 레플리카 하나, target 10)에 목표 공식을 적용하라. HPA는 몇 개를 요청하고 maxReplicas는 어디에서 제한하는가? §11.3의 좌석 계산으로 그 상한이 옳은지 판단하고, 이를 높이려면 어떤 예산 수치가 정당화해야 하는지 설명하라.
+  \item 터미널 기록 11-3의 구간 3(running 32, waiting 26, 레플리카 하나, target 10)에 목표 공식을 적용하라. HPA는 몇 개를 요청하고 maxReplicas는 어디에서 제한하는가? §11.3의 좌석 계산으로 그 상한이 옳은지 판단하고, 이를 높이려면 어떤 예산 수치가 정당화해야 하는지 설명하라.
   \item 트래픽에는 예측 가능한 09:00 증가와 예측할 수 없는 소셜 미디어 스파이크(90초 안에 3×, 10분 뒤 사라짐)의 두 피크가 있다. 둘을 위한 트리거 집합(cron + 대기열 + 여유 용량)을 설계하라. 의도적으로 희생하는 스파이크와 그것이 CFO와 나눌 올바른 대화인 이유도 밝히라.
   \item 팀원이 "더 빨리 비용을 아끼기 위해" scaleDown 안정화를 30 s로 설정한다. 약 7분마다 피크가 오는 출렁이는 트래픽 한 시간을 모델링하라. 탄생 횟수를 세고 각각 150 s인 콜드 스타트 오버헤드 가격을 계산해 "절감"이 음수임을 보인 뒤, 팀원이 옳아지는 트래픽 패턴을 찾아라.
   \item 제5장의 용어인 롤링 업데이트, maxUnavailable, 프로브 게이팅만 사용해 비용 검토자에게 바닥 2개를 옹호하라. 이어 바닥의 월 비용을 계산하고 이를 1로 낮출 수 있는 제품 결정 하나를 제시하라.
@@ -196,7 +196,7 @@ $ kubectl describe pod chat-7f9b4-x2kkj | grep -A2 Events; kubectl logs -f ...
 # "no capacity in zone." never put a node birth on the SLO path.
 \end{Verbatim}
 \end{terminalbox}
-\figcaption{기록 12-3  한 번의 탄생을 항목별로 나눈 결과. 모든 줄에 해당 장이 있다. 16초 풀은 제4장의 엔지니어링, 9초 가중치 가져오기는 제6장, 95초 엔진 초기화는 제11장이다. 합계 150초는 §12.2의 초시계 문제를 정량화한다.}
+\figcaption{터미널 기록 12-3  한 번의 탄생을 항목별로 나눈 결과. 모든 줄에 해당 장이 있다. 16초 풀은 제4장의 엔지니어링, 9초 가중치 가져오기는 제6장, 95초 엔진 초기화는 제11장이다. 합계 150초는 §12.2의 초시계 문제를 정량화한다.}
 
 \begin{tbbfigure}
   \adjustbox{max width=0.94\linewidth,max totalheight=0.46\textheight}{\includegraphics{figures/fig12-3_coldstart.png}}\\[3pt]
@@ -205,7 +205,7 @@ $ kubectl describe pod chat-7f9b4-x2kkj | grep -A2 Events; kubectl logs -f ...
 
 \subsection*{다시 등장한 Firecracker — 해결했지만 엉뚱한 항목}
 
-2주 차에 심어 둔 약속을 이제 지켜야 한다. Firecracker의 microVM은 \textbf{\textasciitilde{}125 milliseconds}에 부팅한다. 2005년에 몇 분 걸리던 격리 환경은 2018년에 사실상 공짜가 되었다. 제2장 §2.4는 12주 차의 교훈을 미리 말했다. \textit{"병목은 환경이 아니라 페이로드가 되었다."} 기록 12-3을 이 주장에 비추어 읽어 보자. VM/컨테이너 메커니즘은 2초짜리 \code{Scheduled} 줄에 기여하고 나머지는 거의 없다. 남은 148초는 \textbf{페이로드}다. 3.1 GB 이미지, 6 GB 가중치, CUDA 컨텍스트, 엔진 전체의 할당과 그래프 캡처가 차지한다. 서버리스 CPU는 영리한 문제였지만 \textbf{서버리스 GPU}가 진짜 어려운 이유다. Lambda의 기법인 미리 부팅한 microVM 풀 + 스냅샷/복원은 밀리초 규모 문제를 공격한다. GPU 버전은 \textit{기가바이트}를 미리 배치하고 초기화된 CUDA 프로세스를 되살려야 한다. 초 단위 GPU 요금을 파는 플랫폼(Modal, RunPod, Cloud Run GPU)은 따뜻한 풀, 공격적 이미지 스트리밍, 점차 늘어나는 \textbf{GPU 체크포인트/복원}으로 바로 이 전쟁을 치른다. 완전히 초기화한 엔진 프로세스를 스냅샷하고 몇 초 안에 복원한다. 이 장의 더 읽을거리에 있는 "1초 미만 콜드 스타트" 엔지니어링 글은 모두 이 기법의 변형이다. 가격표를 보면 전쟁이 공짜가 아님을 알 수 있다. 초 단위 요금은 원시 VM보다 프리미엄이 붙는다. 교재의 플릿에는 이런 플랫폼이 아니라 사다리가 필요하다.
+2주 차에 심어 둔 약속을 이제 지켜야 한다. Firecracker의 microVM은 \textbf{\textasciitilde{}125 milliseconds}에 부팅한다. 2005년에 몇 분 걸리던 격리 환경은 2018년에 사실상 공짜가 되었다. 제2장 §2.4는 12주 차의 교훈을 미리 말했다. \textit{"병목은 환경이 아니라 페이로드가 되었다."} 터미널 기록 12-3을 이 주장에 비추어 읽어 보자. VM/컨테이너 메커니즘은 2초짜리 \code{Scheduled} 줄에 기여하고 나머지는 거의 없다. 남은 148초는 \textbf{페이로드}다. 3.1 GB 이미지, 6 GB 가중치, CUDA 컨텍스트, 엔진 전체의 할당과 그래프 캡처가 차지한다. 서버리스 CPU는 영리한 문제였지만 \textbf{서버리스 GPU}가 진짜 어려운 이유다. Lambda의 기법인 미리 부팅한 microVM 풀 + 스냅샷/복원은 밀리초 규모 문제를 공격한다. GPU 버전은 \textit{기가바이트}를 미리 배치하고 초기화된 CUDA 프로세스를 되살려야 한다. 초 단위 GPU 요금을 파는 플랫폼(Modal, RunPod, Cloud Run GPU)은 따뜻한 풀, 공격적 이미지 스트리밍, 점차 늘어나는 \textbf{GPU 체크포인트/복원}으로 바로 이 전쟁을 치른다. 완전히 초기화한 엔진 프로세스를 스냅샷하고 몇 초 안에 복원한다. 이 장의 더 읽을거리에 있는 "1초 미만 콜드 스타트" 엔지니어링 글은 모두 이 기법의 변형이다. 가격표를 보면 전쟁이 공짜가 아님을 알 수 있다. 초 단위 요금은 원시 VM보다 프리미엄이 붙는다. 교재의 플릿에는 이런 플랫폼이 아니라 사다리가 필요하다.
 
 \subsection*{완화 사다리 — 0이 차지하는 정직한 틈새}
 
@@ -214,7 +214,7 @@ $ kubectl describe pod chat-7f9b4-x2kkj | grep -A2 Events; kubectl logs -f ...
 \begin{calloutbox}{tbbpurple}{tbbpurplefill}
 {\normalsize\bfseries\color{tbbpurple}생각해 보기}\par\vspace{3pt}
 \begin{tbbitemize}
-  \item 기록 12-3에서 엔진 초기화(95 s)가 이제 지배적인 항목이다. 제10–11장을 이용해 모델 크기와 함께 증가하는 부분, KV 풀 크기와 함께 증가하는 부분, 고정된 부분을 구분하라. 가장 유망한 공격 두 가지를 제안하고 각각의 절감 시간을 추정하라. 힌트: AWQ 가중치는 1.9 GB이고 CUDA 그래프 캡처 범위를 줄일 수 있다.
+  \item 터미널 기록 12-3에서 엔진 초기화(95 s)가 이제 지배적인 항목이다. 제10–11장을 이용해 모델 크기와 함께 증가하는 부분, KV 풀 크기와 함께 증가하는 부분, 고정된 부분을 구분하라. 가장 유망한 공격 두 가지를 제안하고 각각의 절감 시간을 추정하라. 힌트: AWQ 가중치는 1.9 GB이고 CUDA 그래프 캡처 범위를 줄일 수 있다.
   \item 세 엔드포인트에서 0으로 스케일링의 가격을 계산하라. (a) 채팅 플릿, (b) 야간 배치 스코어러, (c) 주 \textasciitilde{}5회 사용하는 내부 RAG 데모다. 각각 유휴 비용 절감액, 첫 적중 지연 시간 비용, 결론을 제시하고 (a)의 결론을 뒤집을 제품 문장을 말하라.
   \item "1초 미만 GPU 콜드 스타트" 블로그 글이 화제가 된다. 이 절을 바탕으로 제목 뒤에서 무엇이 참이어야 하는지 나열하라. 무엇을 스냅샷했는가? 가중치는 어디에 사는가? 따뜻한 풀 비용은 누가 내는가? 벤치마크가 거의 확실히 포함하지 않은 것도 밝히라.
   \item 클러스터 오토스케일러가 피크에 L4에 대해 가끔 "no capacity in zone"을 보고한다. 다른 영역 → 다른 GPU 유형 → 온디맨드→스팟 반전 → 대기열 후 성능 저하로 이어지는 폴백 연쇄를 설계하고, 제5장의 nodeSelector/affinity 메커니즘으로 지금 표현할 수 있는 단계를 표시하라.
@@ -250,7 +250,7 @@ neighbor   3.1ms   38.4ms      214       # p99 x3.9, capacity /2.4
 # noisy neighbor is not folklore - it is a number you now own.
 \end{Verbatim}
 \end{terminalbox}
-\figcaption{기록 12-4  측정한 공유. 분류기 포드 두 개가 실습 T4를 시분할한다. 각자 실행할 때는 문제가 없지만 함께 실행하면 p99가 네 배가 된다. 제2장이 패스스루로 샀다고 한 격리가 사라지자 그 부재가 보인다. 공유는 실제 할인이지만 실제 대가도 있다.}
+\figcaption{터미널 기록 12-4  측정한 공유. 분류기 포드 두 개가 실습 T4를 시분할한다. 각자 실행할 때는 문제가 없지만 함께 실행하면 p99가 네 배가 된다. 제2장이 패스스루로 샀다고 한 격리가 사라지자 그 부재가 보인다. 공유는 실제 할인이지만 실제 대가도 있다.}
 
 \subsection*{MPS와 MIG: 중간 지점과 하드웨어의 답}
 
@@ -278,7 +278,7 @@ neighbor   3.1ms   38.4ms      214       # p99 x3.9, capacity /2.4
 \begin{calloutbox}{tbbpurple}{tbbpurplefill}
 {\normalsize\bfseries\color{tbbpurple}생각해 보기}\par\vspace{3pt}
 \begin{tbbitemize}
-  \item 기록 12-4에서 이웃 세금으로 p99는 9.8 → 38.4 ms가 되었지만 p50은 2.9 → 3.1로 거의 움직이지 않았다. 시분할 메커니즘으로 두 수치를 모두 설명하라. 컨텍스트 전환이 운 나쁜 요청과 평균적인 요청에 각각 어떤 영향을 주는가? 평균과 꼬리 중 어느 SLO 조항 형식이 공유를 기만적으로 안전해 보이게 하는가?
+  \item 터미널 기록 12-4에서 이웃 세금으로 p99는 9.8 → 38.4 ms가 되었지만 p50은 2.9 → 3.1로 거의 움직이지 않았다. 시분할 메커니즘으로 두 수치를 모두 설명하라. 컨텍스트 전환이 운 나쁜 요청과 평균적인 요청에 각각 어떤 영향을 주는가? 평균과 꼬리 중 어느 SLO 조항 형식이 공유를 기만적으로 안전해 보이게 하는가?
   \item 가상의 학과를 위한 MIG 구성을 설계하라. 9주 차 분류기(10 GB, 스파이크형), RAG 임베더(6 GB, 안정적), 내부 요약기(20 GB, 영업시간), 개발 노트북 두 개를 A100-80GB 한 대에 배치한다. 프로파일(1g.10gb/2g.20gb/3g.40gb 혼합)을 고르고 사용 주기로 정당화한 뒤 카드에 넣지 않을 워크로드 하나를 제시하라.
   \item 1g.10gb 조각은 \$0.51로 T4의 \$0.53보다 "유리"하다. 하지만 둘 모두에 §10.2의 같은 두 줄 진단을 적용해 정직하게 다시 비교하라. T4는 320 GB/s, A100의 1/7 조각은 \textasciitilde{}250 GB/s다. 시간당 가격이 아니라 SLO로 결정하라. 언제 T4가 여전히 유리한가?
   \item MPS는 "자신이 자기 자신의 시끄러운 이웃"이라고 설명한다. 자신의 프로젝트에서 피크가 완전히 상관된 같은 트리거의 서비스 두 개로 반례를 구성하고, 피크에는 MPS가 아무것도 절감하지 못하는 이유를 보이라. Insull의 다양성 요구를 CUDA로 다시 표현한 문제다.
@@ -312,7 +312,7 @@ NAME   URL                        READY   LATEST   PREV   AGE
 chat   http://chat.team.svc...    True    90       10     61s
 \end{Verbatim}
 \end{terminalbox}
-\figcaption{기록 12-5  15줄로 표현한 플랫폼 하나. InferenceService는 이 교재의 제5–12장을 필드로 인코딩한다. canaryTrafficPercent 줄은 제13장을 예고한다. CI 파이프라인이 제어하기를 기다리는 트래픽 분할이다.}
+\figcaption{터미널 기록 12-5  15줄로 표현한 플랫폼 하나. InferenceService는 이 교재의 제5–12장을 필드로 인코딩한다. canaryTrafficPercent 줄은 제13장을 예고한다. CI 파이프라인이 제어하기를 기다리는 트래픽 분할이다.}
 
 \begin{tbbfigure}
   \adjustbox{max width=0.94\linewidth,max totalheight=0.46\textheight}{\includegraphics{figures/fig12-5_kserve.png}}\\[3pt]
@@ -367,7 +367,7 @@ $ python fleet_ledger.py --final          # the course's bill, walked
    break-even curve: closed, with measured numbers, 11 weeks later.
 \end{Verbatim}
 \end{terminalbox}
-\figcaption{기록 12-6  결승선. \$4,762 → \$2,381(최적화) → \$1,513(오토스케일링) → \$877(포트폴리오)로 줄어 1주 차 상한보다 \$23 낮아졌다. 모든 단계가 측정한 수단이다. \$/M-token 항목은 교재 첫머리의 자체 구축 대 외부 도입 질문을 마무리한다. 답은 구호가 아니라 사용률이었다.}
+\figcaption{터미널 기록 12-6  결승선. \$4,762 → \$2,381(최적화) → \$1,513(오토스케일링) → \$877(포트폴리오)로 줄어 1주 차 상한보다 \$23 낮아졌다. 모든 단계가 측정한 수단이다. \$/M-token 항목은 교재 첫머리의 자체 구축 대 외부 도입 질문을 마무리한다. 답은 구호가 아니라 사용률이었다.}
 
 세 가지 습관이 일회성 승리를 영웅적인 오후가 아닌 지속적 규율인 \textbf{FinOps}로 바꾼다. \textbf{총액이 아니라 단위를 계량한다.} 중요한 청구서는 \$/M tokens 또는 \$/K requests다. 주, 모델, API 대안과 비교할 수 있기 때문이다. 총지출은 제품이 성장했다는 사실만 알려 준다. \textbf{태그를 붙이고 비용을 공개한다.} 모든 자원에 team/model/env 레이블을 붙여 원장을 분해한다. 제6장의 NAT 함정(\$5k/yr, 조용함)은 태그 없는 배관에 숨은 지출의 대표 사례다. \textbf{이상에 경보를 건다.} 예측의 80\%/100\%/120\%에서 예산 경보를 울린다. 제2장 실습의 가드레일(guardrail)이 프로덕션으로 승격되어 누수 GPU, 잊힌 개발 플릿, 트래픽으로 청구되는 재시도 폭풍을 잡는다. 화려한 일은 아니지만 \$877이 그대로 유지되는 것과 유령 GPU가 조용히 돌아오는 것의 차이다. 한 세기 뒤에도 Insull의 진짜 제품은 같다. \textbf{감시하는 용량}이다.
 
@@ -388,7 +388,7 @@ $ python fleet_ledger.py --final          # the course's bill, walked
 \begin{calloutbox}{tbbpurple}{tbbpurplefill}
 {\normalsize\bfseries\color{tbbpurple}생각해 보기}\par\vspace{3pt}
 \begin{tbbitemize}
-  \item 트래픽이 두 배이고(피크 동시 스트림 208개, 같은 형태) 기록 12-6을 다시 작성하라. 계단, rep-h/day, 포트폴리오 분할, 최종 청구서, \$/M tokens를 계산하라. 어느 항목이 개선되고 어느 항목이 나빠지는가? 제품이 성장할수록 단위 비용이 \textit{낮아지는} 이유도 설명하라. Insull이라면 알고 있을 것이다.
+  \item 트래픽이 두 배이고(피크 동시 스트림 208개, 같은 형태) 터미널 기록 12-6을 다시 작성하라. 계단, rep-h/day, 포트폴리오 분할, 최종 청구서, \$/M tokens를 계산하라. 어느 항목이 개선되고 어느 항목이 나빠지는가? 제품이 성장할수록 단위 비용이 \textit{낮아지는} 이유도 설명하라. Insull이라면 알고 있을 것이다.
   \item 약정은 1년간 레플리카 2개를 포함한다. 4개월째에 INT4 빌드(§11.5)가 도입되어 레플리카마다 스트림을 1.6× 더 처리한다. 과도하게 약정했는가? 성장해 채우기, 바닥 워크로드 이동, 재판매/수정 선택지를 검토하고 최적화 로드맵 아래에서 약정할 계획 규칙을 도출하라.
   \item KServe 카나리 필드는 트래픽을 90/10으로 나눈다. 하지만 §10.3의 게이트는 INT4 모델이 안전하다고 이미 결정했다. 카나리는 게이트가 확인할 수 없는 무엇을 검사하는가? 실제 트래픽 분포, 실제 인프라, 실제 SLO를 고려하라. 제13장의 첫 논거를 세 문장으로 작성해 보라.
   \item 실습 원장에서 자신의 프로젝트 손익분기 API 가격을 계산하라. 어느 \$/M tokens에서 자체 호스팅의 우위가 사라지며, 사용률, GPU 가격, 레플리카당 토큰 중 어느 단일 입력이 답을 가장 크게 움직이는가? "왜 그냥 API를 쓰지 않는가?"에 답하는 한 장짜리 슬라이드로 제시하라.
@@ -407,11 +407,11 @@ $ python fleet_ledger.py --final          # the course's bill, walked
 \subsection*{A부 — 네 가지 측정(①–⑤)}
 
 \begin{tbbitemize}
-  \item \textbf{① KEDA를 대기열에 연결한다.} 실습 자료의 데모 환경을 배포한다. GPU 네 대 없이도 스케일링이 보이도록 CPU 모드 레플리카를 사용한다. Prometheus + KEDA + 기록 12-1의 ScaledObject를 \code{vllm:num\_requests\_waiting}에 연결하고 최소 1 / 최대 4로 설정한다. KEDA가 생성한 HPA 객체를 확인한다. 한 단계 위에서 관리자를 관리하는 제5장의 패턴이다.
+  \item \textbf{① KEDA를 대기열에 연결한다.} 실습 자료의 데모 환경을 배포한다. GPU 네 대 없이도 스케일링이 보이도록 CPU 모드 레플리카를 사용한다. Prometheus + KEDA + 터미널 기록 12-1의 ScaledObject를 \code{vllm:num\_requests\_waiting}에 연결하고 최소 1 / 최대 4로 설정한다. KEDA가 생성한 HPA 객체를 확인한다. 한 단계 위에서 관리자를 관리하는 제5장의 패턴이다.
   \item \textbf{② 09:00 파도를 보낸다.} 제11장의 토큰 인식 하네스로 동시성을 높이고 세 터미널(\code{kubectl get hpa -w}, \code{get pods -w}, 하네스의 TTFT 로그)에서 \code{waiting → desired → pods}를 지켜본다. 사건 전체의 TTFT p99 그래프를 그리고 감지, 탄생, 드레인을 표시한다. 이어 08:40 cron 트리거를 추가하고 같은 파도를 보낸다. GPU 비용 \textasciitilde{}\$0로 그래프 두 개와 교훈 하나를 얻는다.
-  \item \textbf{③ 실제 탄생 하나의 시간을 잰다.} GPU 노드에서 vLLM 포드를 삭제하고 \code{kubectl describe pod} + 엔진 로그를 사용해 기록 12-3의 항목을 초시계로 잰다. 각 줄을 담당 장과 ±20\% 안에서 맞추고 플릿의 지배 항목과 이를 공격할 사다리 단을 제시한다. 이 수치는 \textit{자신의} 반응 시간 예산으로 중간 점검 패키지에 들어간다.
-  \item \textbf{④ T4를 분할하고 대가를 측정한다.} 시분할 ConfigMap(replicas: 4)을 적용하고 분류기 포드 두 개를 함께 스케줄링한 뒤, 9주 차 스윕을 단독 대 이웃 있음으로 다시 실행한다(기록 12-4). 두 경우의 p50, p99, req/s@SLO를 보고하고 SLO 아래에서 시분할에 관한 한 문장 결론을 작성한다.
-  \item \textbf{⑤ 원장을 마감한다.} 기록 12-6의 빈칸을 \textit{자신이} 측정한 수치로 채운다. 실제 하루의 지표나 실습 자료 재생에서 얻은 계단, rep-h/day, 실시간 가격표에서 정한 포트폴리오 분할, API 대안과 비교한 \$/M tokens를 넣는다. 모든 빈칸의 출처를 측정값이나 가격표로 추적할 수 있어야 한다. 채점자가 가장 먼저 확인하는 항목이다.
+  \item \textbf{③ 실제 탄생 하나의 시간을 잰다.} GPU 노드에서 vLLM 포드를 삭제하고 \code{kubectl describe pod} + 엔진 로그를 사용해 터미널 기록 12-3의 항목을 초시계로 잰다. 각 줄을 담당 장과 ±20\% 안에서 맞추고 플릿의 지배 항목과 이를 공격할 사다리 단을 제시한다. 이 수치는 \textit{자신의} 반응 시간 예산으로 중간 점검 패키지에 들어간다.
+  \item \textbf{④ T4를 분할하고 대가를 측정한다.} 시분할 ConfigMap(replicas: 4)을 적용하고 분류기 포드 두 개를 함께 스케줄링한 뒤, 9주 차 스윕을 단독 대 이웃 있음으로 다시 실행한다(터미널 기록 12-4). 두 경우의 p50, p99, req/s@SLO를 보고하고 SLO 아래에서 시분할에 관한 한 문장 결론을 작성한다.
+  \item \textbf{⑤ 원장을 마감한다.} 터미널 기록 12-6의 빈칸을 \textit{자신이} 측정한 수치로 채운다. 실제 하루의 지표나 실습 자료 재생에서 얻은 계단, rep-h/day, 실시간 가격표에서 정한 포트폴리오 분할, API 대안과 비교한 \$/M tokens를 넣는다. 모든 빈칸의 출처를 측정값이나 가격표로 추적할 수 있어야 한다. 채점자가 가장 먼저 확인하는 항목이다.
 \end{tbbitemize}
 
 \subsection*{B부 — 중간 점검 패키지(⑥–⑦)}
@@ -566,17 +566,17 @@ $ python fleet_ledger.py --final          # the course's bill, walked
 
 \qitem{1}{\textbf{②} 오토스케일러의 눈이 경합하지 않는 자원을 본다. 제9장 사례 A의 거울상이다. 그때는 CPU가 고정되고 GPU가 쉬었지만 여기서는 GPU가 고전하는 동안 CPU가 쉰다. 수요 신호로 스케일링해야 한다. (§12.2)}
 
-\qitem{2}{\textbf{②} 한 지표가 세 속성을 모두 갖고 있으며 제11장에서 읽는 법을 배우고 기록 11-3에서 관찰한 바로 그 항목이다. 공급 게이지인 CPU\%, GPU\%는 세 속성 중 하나 이상에서 실패한다. (§12.2)}
+\qitem{2}{\textbf{②} 한 지표가 세 속성을 모두 갖고 있으며 제11장에서 읽는 법을 배우고 터미널 기록 11-3에서 관찰한 바로 그 항목이다. 공급 게이지인 CPU\%, GPU\%는 세 속성 중 하나 이상에서 실패한다. (§12.2)}
 
 \qitem{3}{\textbf{②} 비대칭은 레플리카 몇 분과 SLO 위반 + 다시 내는 탄생 비용을 비교하는 손실 함수를 인코딩한다. 플래핑의 최악 사례는 제10장의 스케일 아웃 시 컴파일 생각해 볼 문제다. (§12.2)}
 
 \qitem{4}{\textbf{③} 레플리카당 지표는 20.5다. desired = ceil(2 × 20.5/10) = ceil(4.1) = 5를 계산한 뒤 상한을 적용한다. ④는 고전적 오류다. 공식은 현재 수를 스케일링하며 원시 합계를 나누는 것이 아니다. (§12.2)}
 
-\qitem{5}{\textbf{②} 기록 12-3에서 환경은 150초 중 \textasciitilde{}2 s만 차지한다. Firecracker는 2005년 문제를 훌륭하게 해결했지만 2026년 문제는 수 기가바이트와 CUDA 컨텍스트다. 더 빠른 부팅이 아니라 따뜻한 풀과 스냅샷이 필요하다. (§12.3)}
+\qitem{5}{\textbf{②} 터미널 기록 12-3에서 환경은 150초 중 \textasciitilde{}2 s만 차지한다. Firecracker는 2005년 문제를 훌륭하게 해결했지만 2026년 문제는 수 기가바이트와 CUDA 컨텍스트다. 더 빠른 부팅이 아니라 따뜻한 풀과 스냅샷이 필요하다. (§12.3)}
 
 \qitem{6}{\textbf{③} 결정 규칙은 유휴 시간이 아니라 호출자의 지연 시간 허용 범위다. (a)는 이를 충족하지 못한다. 03:00 사용자도 실제이고 바닥은 롤아웃에도 필요하다. (§12.3)}
 
-\qitem{7}{\textbf{③} 기록 12-4의 측정값은 p50 3.1 ms, p99 38.4 ms다. 꼬리 요청이 컨텍스트 전환과 이웃의 배치를 먹으며 VRAM은 공유한다. SLO 아래의 시분할은 제14장의 전쟁 이야기를 미리 구매하는 셈이다. (§12.4)}
+\qitem{7}{\textbf{③} 터미널 기록 12-4의 측정값은 p50 3.1 ms, p99 38.4 ms다. 꼬리 요청이 컨텍스트 전환과 이웃의 배치를 먹으며 VRAM은 공유한다. SLO 아래의 시분할은 제14장의 전쟁 이야기를 미리 구매하는 셈이다. (§12.4)}
 
 \qitem{8}{\textbf{③} 계단은 계층별로 요금표에 대응한다. 바닥을 스팟에 두는 것은 점검표에서 가장 붉은 위험 신호다. 03:00에 회수되면 대체 용량이 없다. (§12.5)}
 
@@ -609,7 +609,7 @@ $ python fleet_ledger.py --final          # the course's bill, walked
 \textbf{[이번 주]}로 표시한 자료는 실습을 직접 뒷받침하고, \textbf{[N주 차]}는 나중에 도움이 될 자료를 뜻한다.
 
 \begin{tbbitemize}
-  \item \textbf{[이번 주] Kubernetes HPA documentation — "Horizontal Pod Autoscaling" (algorithm + behavior/stabilization)} 및 \textbf{KEDA docs — ScaledObject, Prometheus scaler, cron scaler} — 기록 12-1/12-2의 권위 있는 출처다. behavior 절은 §12.2의 성향을 그대로 설명한다.
+  \item \textbf{[이번 주] Kubernetes HPA documentation — "Horizontal Pod Autoscaling" (algorithm + behavior/stabilization)} 및 \textbf{KEDA docs — ScaledObject, Prometheus scaler, cron scaler} — 터미널 기록 12-1/12-2의 권위 있는 출처다. behavior 절은 §12.2의 성향을 그대로 설명한다.
   \item \textbf{[이번 주] NVIDIA MIG User Guide · GPU Operator time-slicing docs} — 제2장 §2.6이 이번 주 직접 다룬다고 약속한 프로파일, K8s 장치 플러그인 전략, 재구성 드레인 주의점을 운영 관점에서 설명한다.
   \item \textbf{[이번 주] KServe documentation — InferenceService \& autoscaling} — 제9장의 "CRD를 훑고 12주 차에 배포하라"는 과제를 수행할 때가 되었다. 동시성 기반 기본값은 §12.2가 제도화된 모습이다.
   \item \textbf{A. Agache et al., "Firecracker" (NSDI 2020), §§1–2 다시 읽기} — 2주 차 필독 자료를 두 번째로 읽는다. 이번에는 "내 150초 중 무엇을 해결하는가?"라고 물어보자. 답이 "2초"라는 사실이 §12.3의 교훈이다.
@@ -623,5 +623,5 @@ $ python fleet_ledger.py --final          # the course's bill, walked
 
 \begin{calloutbox}{tbbblue}{tbbbluefill}
 {\normalsize\bfseries\color{tbbblue}다음 장 — 제13장: MLOps와 배포 자동화}\par\vspace{3pt}
-플릿은 이제 숨 쉬고 원장도 마감되었다. 하지만 이 교재에서 배포한 모든 개선은 \textbf{사람이 kubectl을 입력해} 배포했다. 기록 12-5에는 \code{canaryTrafficPercent: 10}이라는 조절점이 매달린 채 남았다. 아무도 제어하지 않는 트래픽 분할이다. 제13장은 그 운전자를 만든다. 제4장의 다이제스트와 제6장의 저장소를 승격 워크플로로 발전시킨 \textbf{모델 레지스트리와 버전 관리}, 모든 후보에 제10장의 게이트와 제9장의 스윕을 실행하는 \textbf{CI/CD 파이프라인}(실습에서는 GitHub Actions), 오프라인 게이트가 확인할 수 없는 것을 10\% 분할로 검사하는 \textbf{카나리, A/B, 섀도 배포(shadow deployment)}, 그리고 오퍼레이터까지 외주화한 KServe와 같은 플랫폼 절충인 \textbf{관리형 엔드포인트}(SageMaker, Vertex AI)를 냉정하게 살펴본다. 목표는 모든 당직 엔지니어가 참이기를 바라는 한 문장이다. \textit{배포는 지루하다.}
+플릿은 이제 숨 쉬고 원장도 마감되었다. 하지만 이 교재에서 배포한 모든 개선은 \textbf{사람이 kubectl을 입력해} 배포했다. 터미널 기록 12-5에는 \code{canaryTrafficPercent: 10}이라는 조절점이 매달린 채 남았다. 아무도 제어하지 않는 트래픽 분할이다. 제13장은 그 운전자를 만든다. 제4장의 다이제스트와 제6장의 저장소를 승격 워크플로로 발전시킨 \textbf{모델 레지스트리와 버전 관리}, 모든 후보에 제10장의 게이트와 제9장의 스윕을 실행하는 \textbf{CI/CD 파이프라인}(실습에서는 GitHub Actions), 오프라인 게이트가 확인할 수 없는 것을 10\% 분할로 검사하는 \textbf{카나리, A/B, 섀도 배포(shadow deployment)}, 그리고 오퍼레이터까지 외주화한 KServe와 같은 플랫폼 절충인 \textbf{관리형 엔드포인트}(SageMaker, Vertex AI)를 냉정하게 살펴본다. 목표는 모든 당직 엔지니어가 참이기를 바라는 한 문장이다. \textit{배포는 지루하다.}
 \end{calloutbox}

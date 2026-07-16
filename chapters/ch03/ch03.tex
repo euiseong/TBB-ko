@@ -68,7 +68,7 @@ $ ls -l /proc/41320/ns/pid                         # and its private view
 ... /proc/41320/ns/pid -> pid:[4026532871]
 \end{Verbatim}
 \end{terminalbox}
-\figcaption{기록 3-1  일반 프로세스 도구를 사용해 호스트에서 실행 중인 컨테이너를 심문한 결과. cgroup과 네임스페이스가 연결된 프로세스(PID 41320)다.}
+\figcaption{터미널 기록 3-1  일반 프로세스 도구를 사용해 호스트에서 실행 중인 컨테이너를 심문한 결과. cgroup과 네임스페이스가 연결된 프로세스(PID 41320)다.}
 
 기록을 아래에서 위로 읽으면 다섯 줄에 이 장 전체가 예고되어 있다. 컨테이너는 \textbf{호스트 ps에 보인다}. 런타임 shim의 자식인 프로세스 41320이며, 다른 프로세스처럼 메모리 9 MB를 사용한다. \code{-m 512m} 플래그는 \textbf{파일 속 숫자}가 되었다(\code{memory.max = 536870912}, 3.3절). "격리"는 \code{/\allowbreak proc/\allowbreak 41320/\allowbreak ns/\allowbreak } 아래의 \textbf{네임스페이스 링크 집합}이다(3.2절). 호스트 커널은 이 프로세스를 스케줄링하고 사용량을 계산하며, 3.6절에서 생생히 보여 주듯 죽일 수도 있다. Docker의 기여는 설정을 오케스트레이션하는 것이지 새로운 종류의 무언가를 만들어 내는 것이 아니다.
 
@@ -80,7 +80,7 @@ $ ls -l /proc/41320/ns/pid                         # and its private view
   \item \textbf{이 책의 나머지 동안 모델 서버는 컨테이너다.} 4주 차에는 이미지로 패키징하고, 5주 차에는 Kubernetes가 스케줄링하며, 9\textasciitilde{}12주 차에는 그 안에서 서빙한다. 자원 한도, 상태 검사, 네트워킹, GPU 접근 등 시스템이 컨테이너에 하는 모든 일은 결국 이 장의 세 메커니즘으로 귀결된다. 오작동하면 이 계층에서 디버깅한다.
   \item \textbf{이 장의 대미를 장식하는 것은 실전에서 가장 흔한 서빙 장애다.} \code{OOMKilled}, 종료 코드 137과 함께 애플리케이션 로그 없이 죽는 추론 pod도 memory.max가 cgroup 파일이고 OOM 킬러가 이를 강제한다는 사실을 알면 수수께끼가 아니다. 3.6절은 언젠가 오전 2시에 읽게 될 실제 \code{dmesg} 줄과 \code{kubectl} 출력을 통해 이 사고를 체크리스트로 바꾼다.
   \item \textbf{이미지 계층은 지연 시간 예산이다.} PyTorch/CUDA 이미지는 5–10 GB에 이른다. 새 노드로 이미지를 가져오는 시간이 12주 차 콜드 스타트 청구서에서 단일 항목으로는 최대일 때가 많다. \code{RUN rm}을 실행해도 아무것도 작아지지 않는 이유를 포함해 overlayfs(3.4절)를 이해하면 이미지 축소가 맹목적인 관습이 아니라 합리적인 작업이 된다.
-  \item \textbf{디버깅의 성격이 바뀐다.} 컨테이너가 프로세스라는 사실을 알면 기록 3-1의 도구 상자를 어디서든 사용할 수 있다. \code{ps}, \code{/\allowbreak proc/\allowbreak <pid>/\allowbreak ns}, cgroup 파일, 내부로 들어가는 \code{nsenter}다. 상자가 더는 불투명하지 않고, "컨테이너에서는 작동합니다"가 대화의 끝이 아니게 된다.
+  \item \textbf{디버깅의 성격이 바뀐다.} 컨테이너가 프로세스라는 사실을 알면 터미널 기록 3-1의 도구 상자를 어디서든 사용할 수 있다. \code{ps}, \code{/\allowbreak proc/\allowbreak <pid>/\allowbreak ns}, cgroup 파일, 내부로 들어가는 \code{nsenter}다. 상자가 더는 불투명하지 않고, "컨테이너에서는 작동합니다"가 대화의 끝이 아니게 된다.
 \end{tbbitemize}
 
 이 장의 구성은 레시피를 반영한다. 3.2\textasciitilde{}3.4절은 보는 것, 사용하는 것, 존재하는 것에 해당하는 재료를 하나씩 다루며, 각각 명령 기록과 계산 예시를 제시한다. 3.5절에서는 이번 주 시청 자료인 Liz Rice의 유명한 라이브 코딩 시연 구조를 따라 셸만으로 재료를 조립해 작동하는 컨테이너를 만든다. 3.6\textasciitilde{}3.7절에서는 이렇게 얻은 이해를 이 장에서 가장 가치 있는 운영 기술 하나에 쓴다. OOM 킬러를 예측하고 관찰하며 살아남는 법이다.
@@ -89,7 +89,7 @@ $ ls -l /proc/41320/ns/pid                         # and its private view
 {\normalsize\bfseries\color{tbbpurple}생각해 보기}\par\vspace{3pt}
 \begin{tbbitemize}
   \item Docker for Mac/Windows는 내부에서 Linux VM을 실행한다. 이 절의 주장과 제2장을 이용해 왜 그래야 하는지 설명해 보자. 이 사실은 노트북 위에서 "컨테이너는 VM보다 가볍다"는 말에 어떤 함의를 갖는가?
-  \item 기록 3-1에서 sleep의 부모는 입력한 docker CLI가 아니라 "shim" 프로세스(PID 41288)다. 수명이 긴 중간자가 유용한 이유를 추측해 보자. (힌트: Docker 데몬이 다시 시작되면 컨테이너에는 무슨 일이 일어나야 하는가?) 4주 차에 확인한다.
+  \item 터미널 기록 3-1에서 sleep의 부모는 입력한 docker CLI가 아니라 "shim" 프로세스(PID 41288)다. 수명이 긴 중간자가 유용한 이유를 추측해 보자. (힌트: Docker 데몬이 다시 시작되면 컨테이너에는 무슨 일이 일어나야 하는가?) 4주 차에 확인한다.
   \item 컨테이너가 그저 프로세스라면 \code{docker exec}는 무엇을 해야 하는가? 네임스페이스를 힌트 삼아 답을 그려 본 뒤, §3.2의 setns와 맞춰 보자.
 \end{tbbitemize}
 \end{calloutbox}
@@ -121,7 +121,7 @@ pid -> pid:[4026532871]   uts -> uts:[4026532864]  ...
 # same number would mean: shared namespace. Free debugging test.
 \end{Verbatim}
 \end{terminalbox}
-\figcaption{기록 3-2  네임스페이스 신원은 검사할 수 있다. inode 번호가 같으면 네임스페이스를 공유한다. "컨테이너에서 X가 보이지 않는다"면 가장 먼저 확인할 항목이다.}
+\figcaption{터미널 기록 3-2  네임스페이스 신원은 검사할 수 있다. inode 번호가 같으면 네임스페이스를 공유한다. "컨테이너에서 X가 보이지 않는다"면 가장 먼저 확인할 항목이다.}
 
 네임스페이스는 원하는 것만 골라 조합할 수 있다. 프로세스가 NET만 분리할 수도 있고(네트워크 테스트에서 흔하다), 모든 것을 한꺼번에 분리할 수도 있다(컨테이너). 더 늦게 등장한 cgroup 네임스페이스와 시간 네임스페이스까지 더하면 현대의 여덟 개가 되지만, 이 장은 고전적인 여섯 개를 다룬다.
 
@@ -141,7 +141,7 @@ root    8   0.0   0.0  ... ps aux
 # two processes exist in this whole "machine" - and I am init.
 \end{Verbatim}
 \end{terminalbox}
-\figcaption{기록 3-3  새 PID 네임스페이스 내부. 셸은 PID 1이고 프로세스 테이블에는 항목 두 개가 있다. (--fork가 중요하다. PID 소속은 자식에게 적용되므로 unshare가 셸을 새 세계로 fork해야 한다.)}
+\figcaption{터미널 기록 3-3  새 PID 네임스페이스 내부. 셸은 PID 1이고 프로세스 테이블에는 항목 두 개가 있다. (--fork가 중요하다. PID 소속은 자식에게 적용되므로 unshare가 셸을 새 세계로 fork해야 한다.)}
 
 \code{--mount-proc} 플래그가 함께 따라오는 이유는 무엇인가? \code{ps}는 커널에 직접 묻지 않고 \textit{/proc 파일 시스템을 읽는다}. \code{/\allowbreak proc}가 여전히 호스트의 마운트를 보여 주면 새 네임스페이스 안에서도 \code{ps}는 호스트의 수천 개 프로세스를 거리낌 없이 보고한다. \code{/\allowbreak proc}를 다시 마운트하면 도구가 새로운 진실을 말한다. 조금 철학적인 이 교훈을 기억하자. \textbf{Linux 시스템에 대한 관점은 마운트가 정직한 만큼만 정직하다.} 실습의 4단계와 14주 차 모니터링 각주에서 다시 등장한다.
 
@@ -222,7 +222,7 @@ system_usec 52211
 nr_throttled 0                                # (watch this one in a moment)
 \end{Verbatim}
 \end{terminalbox}
-\figcaption{기록 3-4  다섯 번의 파일 작업으로 만든 완전한 cgroup 예산. mkdir, 한도를 쓰는 echo 두 번, 등록하는 echo 한 번, 관찰하는 cat이다. Docker와 kubelet이 사용자를 대신해 정확히 이 일을 한다.}
+\figcaption{터미널 기록 3-4  다섯 번의 파일 작업으로 만든 완전한 cgroup 예산. mkdir, 한도를 쓰는 echo 두 번, 등록하는 echo 한 번, 관찰하는 cat이다. Docker와 kubelet이 사용자를 대신해 정확히 이 일을 한다.}
 
 \code{mkdir}, \code{echo}, \code{cat}이 메커니즘의 전부다. 대필자를 알아보자(아래 표 3-2). Docker 플래그나 Kubernetes 한도는 결국 프로그램이 이 파일에 숫자를 쓰는 것이다. v2의 단일 트리는 v1의 컨트롤러별로 뒤얽힌 계층을 대체했다. 현대 배포판과 Kubernetes는 v2를 기본으로 사용하며 이 책도 줄곧 v2를 다룬다.
 
@@ -269,7 +269,7 @@ nr_throttled   118        # windows in which we hit the quota
 throttled_usec 8221340    # 8.2 s of enforced pause, total
 \end{Verbatim}
 \end{terminalbox}
-\figcaption{기록 3-5  스로틀링 진단. 부하가 걸릴 때 nr\_throttled가 증가하면 p99 급증은 코드가 아니라 여기서 만들어진다.}
+\figcaption{터미널 기록 3-5  스로틀링 진단. 부하가 걸릴 때 nr\_throttled가 증가하면 p99 급증은 코드가 아니라 여기서 만들어진다.}
 
 표준 해결책은 메커니즘에서 바로 나온다. 할당량을 높이거나, 지연 시간이 중요한 pod에서는 하드 상한보다 \textbf{가중치}(요청량)를 선호해 유휴 용량을 계속 사용할 수 있게 한다. 또는 플랫폼이 무엇을 설정하는지 이해하고 실질적인 일시 중지를 줄인다. 5주 차에는 이 절을 근거로 "K8s CPU 한도를 설정해야 하는가?"라는 논쟁에 돌아온다. 이 이야기는 제2장의 스틸 타임과 나란히 기억해 두자. \textbf{서로 다른 두 메커니즘이 주는 교훈은 하나다. 코드 아래 계층이 꼬리 지연 시간을 만들어 낼 수 있다.}
 
@@ -345,7 +345,7 @@ $ ls lower/                            #   the bytes still exist below!
 config.txt  keep.txt
 \end{Verbatim}
 \end{terminalbox}
-\figcaption{기록 3-6  한 번에 보는 overlayfs. 읽기는 스택을 통과하고, 쓰기는 파일을 위로 복사한 뒤 수정하며, 삭제는 whiteout 표식으로 파일을 숨긴다. lower 계층은 깨끗하고 공유 가능한 상태를 유지한다.}
+\figcaption{터미널 기록 3-6  한 번에 보는 overlayfs. 읽기는 스택을 통과하고, 쓰기는 파일을 위로 복사한 뒤 수정하며, 삭제는 whiteout 표식으로 파일을 숨긴다. lower 계층은 깨끗하고 공유 가능한 상태를 유지한다.}
 
 세 규칙의 결과를 분명히 해 보자. \textbf{읽기는 위에서 아래로 찾으므로} merged 관점에는 각 경로의 가장 위 버전이 보인다. 뒤 계층이 앞 계층을 수정하지 않고 파일을 "갱신"하는 방식이다. \textbf{쓰기는 copy-up을 일으킨다.} 먼저 파일 전체를 upper 디렉터리로 복사하고 그 사본을 바꾼다. 컨테이너마다 자체 upper가 있으므로 컨테이너 30개가 같은 기본 이미지의 모든 읽기 전용 바이트를 공유하면서도 그 이미지를 각각 "수정"할 수 있다. \textbf{삭제는 whiteout을 남긴다.} 문자 장치 표식(\code{c---------}, 장치 0:0)이 merged 관점에서 \code{keep.txt}를 숨기지만 바이트는 lower 계층에 남는다. whiteout 규칙에는 유명한 비용상 결과가 있다. \textbf{뒤 Dockerfile 계층의 RUN rm은 이미지를 줄이는 것이 아니라 늘린다.} "삭제한" 바이트가 앞 계층에 실려 가고 표식까지 더해진다. 파일을 만든 \textit{바로 그 계층에서} 삭제해야 하며, Dockerfile에서는 같은 \code{RUN} 줄을 뜻한다.
 
@@ -360,7 +360,7 @@ RUN apt-get install -y build-essential && \
     rm -rf /var/lib/apt/lists /tmp/downloads
 \end{Verbatim}
 \end{terminalbox}
-\figcaption{기록 3-7  Dockerfile 실무의 whiteout 규칙. 정리 작업은 치울 대상을 만든 RUN과 같아야 하며, 그렇지 않으면 바이트가 그대로 운반된다.}
+\figcaption{터미널 기록 3-7  Dockerfile 실무의 whiteout 규칙. 정리 작업은 치울 대상을 만든 RUN과 같아야 하며, 그렇지 않으면 바이트가 그대로 운반된다.}
 
 \subsection*{계층이 경제적 설계인 이유 — 서빙 이미지를 장부로 읽기}
 
@@ -391,7 +391,7 @@ RUN apt-get install -y build-essential && \
 {\normalsize\bfseries\color{tbbpurple}생각해 보기}\par\vspace{3pt}
 \begin{tbbitemize}
   \item 팀원의 Dockerfile이 FROM python-slim → COPY . /app → pip install -r /app/requirements.txt → CMD ... 순서다. (a) serve.py 변경, (b) requirements.txt 변경 시 재빌드 동작을 예측하라. 올바르게 순서를 바꾸고 각 경우의 새 비용을 설명하라.
-  \item 기록 3-6의 규칙을 이용해 보자. 같은 이미지의 컨테이너 두 개가 내부의 /var/log/app.log에 각각 내용을 덧붙인다. 서로의 줄이 보이는가? 두 파일은 물리적으로 어디에 존재하는가? 컨테이너를 제거하면 둘은 어떻게 되는가?
+  \item 터미널 기록 3-6의 규칙을 이용해 보자. 같은 이미지의 컨테이너 두 개가 내부의 /var/log/app.log에 각각 내용을 덧붙인다. 서로의 줄이 보이는가? 두 파일은 물리적으로 어디에 존재하는가? 컨테이너를 제거하면 둘은 어떻게 되는가?
   \item 팀이 serve.py (40 KB)만 바뀌는 5.5 GB 이미지를 하루 6번 배포한다고 하자. 올바르게 계층화하면 배포마다 몇 바이트가 이동하는가? COPY가 pip 위에 있는 순서 역전에서는 어떠한가? (레지스트리 송신에도 요금이 부과되므로 제1장의 비용 관점을 적용한다.)
 \end{tbbitemize}
 \end{calloutbox}
@@ -419,7 +419,7 @@ $ hostname
 gpu-node-17                    # untouched. The view really is private.
 \end{Verbatim}
 \end{terminalbox}
-\figcaption{기록 3-8  1\textasciitilde{}2단계. PID 소속은 자식에게 적용되므로 --fork가 중요하다. 터미널 두 개의 호스트 이름 대비가 첫 실습 아티팩트다.}
+\figcaption{터미널 기록 3-8  1\textasciitilde{}2단계. PID 소속은 자식에게 적용되므로 --fork가 중요하다. 터미널 두 개의 호스트 이름 대비가 첫 실습 아티팩트다.}
 
 \subsection*{3단계: 비공개 루트(pivot\_root를 쓰고 chroot를 쓰지 않는 이유)}
 
@@ -436,7 +436,7 @@ $ chroot rootfs /bin/sh                        # MOVE 3 (lab shortcut)
 bin  dev  etc  home  lib  ...  usr  var
 \end{Verbatim}
 \end{terminalbox}
-\figcaption{기록 3-9  3단계. rootfs는 그저 디렉터리이고 이미지는 계층으로 운반되는 rootfs다. Alpine은 3 MB이며 6 GB CUDA 이미지를 바라볼 기준을 제공한다.}
+\figcaption{터미널 기록 3-9  3단계. rootfs는 그저 디렉터리이고 이미지는 계층으로 운반되는 rootfs다. Alpine은 3 MB이며 6 GB CUDA 이미지를 바라볼 기준을 제공한다.}
 
 \subsection*{4단계: 도구가 새로운 진실을 말하게 하기}
 
@@ -451,11 +451,11 @@ PID   USER   COMMAND
   9   root   ps aux
 \end{Verbatim}
 \end{terminalbox}
-\figcaption{기록 3-10  4단계. ps는 /proc를 읽는다. 네임스페이스를 인식하는 proc를 마운트하면 도구가 프로세스 두 개와 PID 1인 셸이라는 새로운 세계를 보고한다.}
+\figcaption{터미널 기록 3-10  4단계. ps는 /proc를 읽는다. 네임스페이스를 인식하는 proc를 마운트하면 도구가 프로세스 두 개와 PID 1인 셸이라는 새로운 세계를 보고한다.}
 
 \subsection*{5단계: 예산과 전체 목록}
 
-호스트의 두 번째 터미널에서 기록 3-4와 똑같이 cgroup을 만든다. \code{mkdir /\allowbreak sys/\allowbreak fs/\allowbreak cgroup/\allowbreak minibox}를 실행하고 \code{memory.max}에 \code{268435456}을 쓰며, 셸의 호스트 PID를 \code{cgroup.procs}에 쓴다. 이제 직접 만든 컨테이너에는 256 MiB 하드 벽이 생겼으며, 실습 B부에서 의도적으로 부딪힌다. 이 순간 존재하는 것을 목록으로 정리해 보자. 자체 호스트 이름(UTS), 자신이 init인 자체 PID 트리(PID), 자체 마운트 테이블과 루트 파일 시스템(MNT + rootfs), 아직 비어 있는 자체 네트워크 스택(NET), 단단한 메모리 예산(cgroup)을 가진 프로세스다. \textbf{이것이 컨테이너다.} 아무것도 설치하지 않았고 데몬도 실행되지 않았으며 Docker는 관여하지 않았다. 사용한 도구는 \code{unshare}, \code{chroot}, \code{mount}, \code{mkdir}, \code{echo}, 3 MB tar 아카이브가 전부다.
+호스트의 두 번째 터미널에서 터미널 기록 3-4와 똑같이 cgroup을 만든다. \code{mkdir /\allowbreak sys/\allowbreak fs/\allowbreak cgroup/\allowbreak minibox}를 실행하고 \code{memory.max}에 \code{268435456}을 쓰며, 셸의 호스트 PID를 \code{cgroup.procs}에 쓴다. 이제 직접 만든 컨테이너에는 256 MiB 하드 벽이 생겼으며, 실습 B부에서 의도적으로 부딪힌다. 이 순간 존재하는 것을 목록으로 정리해 보자. 자체 호스트 이름(UTS), 자신이 init인 자체 PID 트리(PID), 자체 마운트 테이블과 루트 파일 시스템(MNT + rootfs), 아직 비어 있는 자체 네트워크 스택(NET), 단단한 메모리 예산(cgroup)을 가진 프로세스다. \textbf{이것이 컨테이너다.} 아무것도 설치하지 않았고 데몬도 실행되지 않았으며 Docker는 관여하지 않았다. 사용한 도구는 \code{unshare}, \code{chroot}, \code{mount}, \code{mkdir}, \code{echo}, 3 MB tar 아카이브가 전부다.
 
 \subsection*{그렇다면 Docker가 실제로 더하는 것은 무엇인가?}
 
@@ -500,7 +500,7 @@ Last State:   Terminated
   Exit Code:  137
 \end{Verbatim}
 \end{terminalbox}
-\figcaption{기록 3-11  완전한 OOM 증거 사슬. 종료 코드 137, 한도에 가까운 회수 불가능 메모리 anon-rss가 보이는 dmesg 줄, oom\_kill 카운터, 그리고 세 가지를 되풀이하는 Kubernetes다.}
+\figcaption{터미널 기록 3-11  완전한 OOM 증거 사슬. 종료 코드 137, 한도에 가까운 회수 불가능 메모리 anon-rss가 보이는 dmesg 줄, oom\_kill 카운터, 그리고 세 가지를 되풀이하는 Kubernetes다.}
 
 \code{dmesg} 줄에는 자세히 읽은 보람이 있는 세부 사항이 하나 있다. 512 MiB 한도에 \code{anon-rss:498112kB}다. 회수할 수 없는 \textit{익명} 메모리가 예산을 채워 kill이 일어났다. 캐시와 비슷한 \code{file-rss}는 메모리 회수가 이미 벗겨 냈기 때문에 작다. 커널이 자신의 자백에 인쇄한 3.3절의 메모리 회수 미묘함이다.
 
@@ -539,7 +539,7 @@ CPU에서 서빙하는 BERT-base 분류기를 생각해 보자. 실습 B부 워�
 \begin{tbbitemize}
   \item 동료가 우아하게 성능을 낮추기 위해 Python에서 OOM을 잡자고 제안한다(try/except MemoryError). 메커니즘과 두 OOM의 차이를 이용해 (a) cgroup 벽에서는 작동할 수 없는 이유, (b) GPU 쪽에서 매우 비슷한 아이디어가 작동하는 곳을 설명하라.
   \item 서버에서 측정한 급증은 batch 32에서 1.9 GB, batch 64에서 3.4 GB다. 노드 용량상 레플리카당 한도는 2.5 GiB다. 계산 예시의 방법으로 구성을 제안하고, 지연 시간·처리량·비용 삼각형의 어느 꼭짓점을 희생했는지 밝혀라.
-  \item 기록 3-11에서 dmesg가 대신 file-rss:400000kB와 anon-rss:90000kB를 보여 주었다고 하자. "OOM"에 관해 무엇을 알려 주며 해결책이 완전히 달라야 하는 이유는 무엇인가?
+  \item 터미널 기록 3-11에서 dmesg가 대신 file-rss:400000kB와 anon-rss:90000kB를 보여 주었다고 하자. "OOM"에 관해 무엇을 알려 주며 해결책이 완전히 달라야 하는 이유는 무엇인가?
 \end{tbbitemize}
 \end{calloutbox}
 
@@ -549,7 +549,7 @@ CPU에서 서빙하는 BERT-base 분류기를 생각해 보자. 실습 B부 워�
 
 \subsection*{A부 — 다섯 단계 실행하기}
 
-기록 3-8부터 3-10까지 처음부터 끝까지 실행하며 아티팩트 네 가지를 수집한다. 첫째, 터미널 두 개의 \textbf{호스트 이름 대비}로 §3.2의 비공개 관점을 입증한다. 둘째, \code{/\allowbreak proc} 마운트 뒤 \textbf{PID 1 = 자기 셸이라고 표시하는 ps}로 §3.2의 두 가지 진실을 확인한다(마운트 \textit{전}의 \code{ps} 출력도 기록하자 — 그 오류 메시지가 바로 실전에서 만나는 "도구는 /proc를 읽는다"는 교훈이다). 셋째, 내부와 호스트 셸의 \code{ls -l /\allowbreak proc/\allowbreak \$\$/\allowbreak ns}를 비교해 모든 숫자가 다른지 확인하는 \textbf{네임스페이스 inode 비교}다(기록 3-2의 테스트를 직접 만든 컨테이너에 적용한다). 넷째, \code{cat /\allowbreak sys/\allowbreak fs/\allowbreak cgroup/\allowbreak minibox/\allowbreak cgroup.procs}가 컨테이너가 1이라고 믿는 프로세스의 \textit{호스트} PID를 출력하는 \textbf{호스트 쪽 예산 관점}이다. 마지막 아티팩트는 출력 한 줄에 이 장의 명제를 담는다. 같은 프로세스, 두 가지 진실, 하나의 예산이다.
+터미널 기록 3-8부터 3-10까지 처음부터 끝까지 실행하며 아티팩트 네 가지를 수집한다. 첫째, 터미널 두 개의 \textbf{호스트 이름 대비}로 §3.2의 비공개 관점을 입증한다. 둘째, \code{/\allowbreak proc} 마운트 뒤 \textbf{PID 1 = 자기 셸이라고 표시하는 ps}로 §3.2의 두 가지 진실을 확인한다(마운트 \textit{전}의 \code{ps} 출력도 기록하자 — 그 오류 메시지가 바로 실전에서 만나는 "도구는 /proc를 읽는다"는 교훈이다). 셋째, 내부와 호스트 셸의 \code{ls -l /\allowbreak proc/\allowbreak \$\$/\allowbreak ns}를 비교해 모든 숫자가 다른지 확인하는 \textbf{네임스페이스 inode 비교}다(터미널 기록 3-2의 테스트를 직접 만든 컨테이너에 적용한다). 넷째, \code{cat /\allowbreak sys/\allowbreak fs/\allowbreak cgroup/\allowbreak minibox/\allowbreak cgroup.procs}가 컨테이너가 1이라고 믿는 프로세스의 \textit{호스트} PID를 출력하는 \textbf{호스트 쪽 예산 관점}이다. 마지막 아티팩트는 출력 한 줄에 이 장의 명제를 담는다. 같은 프로세스, 두 가지 진실, 하나의 예산이다.
 
 \subsection*{B부 — 처형 관찰하기}
 
@@ -573,7 +573,7 @@ $ echo $?
 137
 \end{Verbatim}
 \end{terminalbox}
-\figcaption{기록 3-12  예상대로 펼쳐지는 B부. 신호를 보고하는 셸이 "Killed"라고 말하며 Python에는 마지막 말할 기회가 없다는 점에 주목한다. 이후 기록 3-11처럼 dmesg와 memory.events를 수집한다.}
+\figcaption{터미널 기록 3-12  예상대로 펼쳐지는 B부. 신호를 보고하는 셸이 "Killed"라고 말하며 Python에는 마지막 말할 기회가 없다는 점에 주목한다. 이후 터미널 기록 3-11처럼 dmesg와 memory.events를 수집한다.}
 
 관찰을 엔지니어링으로 바꾸는 후속 실험 두 가지를 실행한다. \textbf{(1)} \code{memory.high}를 200 MiB로 설정하고 반복한다. 강제 종료가 일어나기 전에 벽 앞 단계의 성격이 바뀐다. 진행이 느려지고 회수가 요동치며 \code{memory.events}의 메모리 압력 카운터가 증가한다. 경보선을 직접 경험하고 14주 차의 좋은 경보가 무엇에 반응하는지 미리 본다. \textbf{(2)} 스크립트 배치 크기를 살아남은 가장 큰 값으로 제한하고 같은 256 MiB 한도에서 전체 실행이 살아남는지 보인다. "가변 부분에 경계를 둔다"는 해결책을 직접 입증하며 계산 예시의 방법을 자체 수치로 뒷받침한다.
 
