@@ -279,7 +279,7 @@ throttled_usec 8221340    # 8.2 s of enforced pause, total
 
 \subsection*{cgroup이 심판 볼 수 있는 것과 없는 것}
 
-나머지 컨트롤러도 살펴보자. \code{io}는 블록 장치 대역폭과 IOPS를 계량하며, 가중치 로딩이 공유 디스크를 두들길 때 중요하다. \code{pids}는 프로세스 수를 제한하는 Liz Rice 시연의 포크 폭탄 울타리다. \code{cpuset}은 그룹을 특정 코어에 고정하며, 제2장 전용 코어 인스턴스의 컨테이너 사촌이다. 이 책의 방향을 결정하므로 없는 것에도 주목해야 한다. \textbf{cgroup에는 GPU 컨트롤러가 없다.} 커널은 \code{/\allowbreak dev/\allowbreak nvidia*} 장치에 대한 \textit{접근}을 통제할 수 있으며, 권한 수준에서 \code{--gpus}가 작동하는 방식이다. 4주 차에 툴킷의 내부 배관을 들여다본다. 그러나 cgroup 트리에는 \code{cpu.max}와 \code{memory.max}처럼 GPU 계산 시간을 나누거나 VRAM을 분할하는 것이 없다. 구체적으로 GPU 하나에 프로세스 둘을 놓으면 어느 쪽이든 VRAM 전체를 \code{cudaMalloc}하거나 SM을 독점할 수 있다. 이 부재 때문에 GPU 공유에는 제2장의 공급자 메커니즘인 시간 분할, MPS, MIG가 필요하며 12주 차 GPU 공유 도구 상자는 이 절과 전혀 다르게 생겼다.
+나머지 컨트롤러도 살펴보자. \code{io}는 블록 장치 대역폭과 IOPS를 계량하며, 가중치 로딩이 공유 디스크를 두들길 때 중요하다. \code{pids}는 프로세스 수를 제한하는 Liz Rice 시연의 포크 폭탄 울타리다. \code{cpuset}은 그룹을 특정 코어에 고정하며, 제2장 전용 코어 인스턴스의 컨테이너 사촌이다. 이 책의 방향을 결정하므로 없는 것에도 주목해야 한다. \textbf{cgroup에는 GPU 컨트롤러가 없다.} 커널은 \code{/\allowbreak dev/\allowbreak nvidia*} 장치에 대한 \textit{접근}을 통제할 수 있으며, 권한 수준에서 \code{--gpus}가 작동하는 방식이다. 4주 차에 툴킷의 내부 배관을 들여다본다. 그러나 cgroup 트리에는 \code{cpu.max}와 \code{memory.max}처럼 GPU 계산 시간을 나누거나 VRAM을 분할하는 것이 없다. 구체적으로 GPU 하나에 프로세스 둘을 놓으면 어느 쪽이든 VRAM 전체를 \code{cudaMalloc}하거나 SM을 독점할 수 있다. 이 부재 때문에 GPU 공유에는 제2장의 공급업체 메커니즘인 시간 분할, MPS, MIG가 필요하며 12주 차 GPU 공유 도구 상자는 이 절과 전혀 다르게 생겼다.
 
 \begin{tbbtablewrap}
   \begin{tabular}{@{}>{\raggedright\arraybackslash}m{\dimexpr 0.3511\tbltextwidth-2\tabcolsep\relax} >{\raggedright\arraybackslash}m{\dimexpr 0.3298\tbltextwidth-2\tabcolsep\relax} >{\raggedright\arraybackslash}m{\dimexpr 0.3191\tbltextwidth-2\tabcolsep\relax}@{}}
@@ -700,7 +700,7 @@ $ echo $?
 
 \subsection*{A. 객관식}
 
-\qitem{1}{\textbf{②} 레시피 관점이다. 커널에는 컨테이너 객체가 없고(①), 제2장의 VM과 달리 두 번째 커널이 관여하지 않으며(③), 메커니즘은 공급자 중립적인 커널 기능이다(④). (§3.1)}
+\qitem{1}{\textbf{②} 레시피 관점이다. 커널에는 컨테이너 객체가 없고(①), 제2장의 VM과 달리 두 번째 커널이 관여하지 않으며(③), 메커니즘은 공급업체 중립적인 커널 기능이다(④). (§3.1)}
 
 \qitem{2}{\textbf{③} PID 1 의미론 때문이다. 커널은 init의 기본 신호 처리를 비활성화하므로 처리되지 않은 SIGTERM은 치명적인 대신 무시된다. 코드 또는 tini/--init으로 고친다. (§3.2)}
 
