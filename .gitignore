@@ -14,8 +14,12 @@
 *.run.xml
 *.bcf
 
-# Built PDF (regenerate with `make`)
-main.pdf
+# Generated root-level PDFs (book builds and typesetting experiments)
+/*.pdf
+
+# Local translation review notes
+/*-review.md
+/english-errata.md
 
 # Python
 __pycache__/
@@ -24,4 +28,8 @@ __pycache__/
 # Editor / OS
 .DS_Store
 *.swp
+*.swo
+*.bak
+*.tmp
+*~
 .vscode/
