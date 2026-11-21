@@ -1,16 +1,16 @@
 %% Chapter 5 — Kubernetes
 \setcounter{chapter}{4}
 \chapter{Kubernetes}
-\chaptersubtitle{서빙 플릿을 움직이는 제어 루프 — 원하는 상태, 정직한 자원 예산, 값비싼 하드웨어를 배치하는 스케줄러}
+\chaptersubtitle{원하는 상태를 유지하는 제어 루프와 GPU를 배치하는 스케줄러}
 
 \begin{calloutbox}{tbbblue}{tbbbluefill}
 {\normalsize\bfseries\color{tbbblue}학습 목표}\par\vspace{3pt}
 \begin{tbbitemize}
-  \item Kubernetes의 핵심 아이디어 하나, 즉 데이터베이스에 원하는 상태를 저장하고 제어 루프로 조정한다는 개념을 설명하고, 파드가 죽거나 노드가 사라지거나 배포가 명세를 바꾸는 등 현실이 원하는 상태에서 벗어날 때 클러스터가 어떻게 움직일지 예측한다.
+  \item Kubernetes가 원하는 상태를 데이터베이스에 기록하고 실제 상태를 거기에 맞추는 원리를 설명한다. 파드나 노드가 사라지거나 배포 명세가 바뀌면 제어 루프가 다음에 무엇을 할지 예측한다.
   \item 컨트롤 플레인과 노드의 구성 요소를 열거하고, 한 번의 \code{kubectl apply}가 API 서버 → etcd → 컨트롤러 → 스케줄러 → kubelet → containerd/runc → 제3장의 네임스페이스와 cgroup으로 이어지는 전 과정을 추적한다.
   \item 모델 서버를 Pod + Deployment + Service로 배포하고, 느린 모델 로딩에 맞춰 시작·준비·활성 프로브를 올바르게 연결하며, 준비 상태가 트래픽과 롤링 업데이트를 어떻게 제어하는지 설명한다.
-  \item 리소스 requests와 limits가 실제로 무엇인지, 즉 스케줄러의 산술과 cgroup 파일이라는 차이로 해석하고, 노드 패킹을 직접 계산하며, 서빙 파드에 알맞은 QoS 클래스를 의도적으로 선택한다.
-  \item 확장 리소스와 정수 단위 할당, 테인트와 어피니티, 빈 패킹과 분산 배치, 그리고 플릿에서 가장 값비싼 하드웨어를 조용히 놀리는 단편화까지 GPU 스케줄링을 논리적으로 분석한다.
+  \item requests는 스케줄러의 배치 계산에, limits는 커널의 자원 제한에 어떻게 쓰이는지 설명한다. 노드 한 대에 파드를 몇 개까지 배치할 수 있는지 계산하고 서빙 파드에 맞는 QoS 클래스를 고른다.
+  \item 확장 리소스와 정수 단위 할당, 테인트와 어피니티, 빈 패킹과 분산 배치, 그리고 서버군에서 가장 값비싼 하드웨어를 조용히 놀리는 단편화까지 GPU 스케줄링을 논리적으로 분석한다.
   \item 대표적인 여섯 가지 파드 실패 상태인 Pending, ImagePullBackOff, CrashLoopBackOff, OOMKilled, Evicted, 준비됐지만 라우팅되지 않는 상태(ready-but-unrouted)를 각각의 징후로 진단하고, 상황별로 가장 먼저 실행할 명령을 고른다.
 \end{tbbitemize}
 \end{calloutbox}
@@ -26,7 +26,7 @@
 
 \begin{calloutbox}{tbblightgray}{tbbboxfill}
 {\normalsize\bfseries\color{tbbink}장 구성}\par\vspace{3pt}
-\textbf{5.1} 제어 루프로서의 클러스터    \textbf{5.2} 구조: 자기주장이 있는 데이터베이스    \textbf{5.3} Pods, Deployments, Services — 서빙의 세 축    \textbf{5.4} requests, limits, QoS: 플릿 규모로 확장한 제3장    \textbf{5.5} GPU와 스케줄러    \textbf{5.6} 죽어 가는 파드 현장 안내서    \textbf{5.7} 실습: 모델 서버 오케스트레이션 — 이어서 요약, 연습문제, 더 읽을거리.
+\textbf{5.1} 클러스터가 원하는 상태를 유지하는 원리    \textbf{5.2} etcd와 제어 루프로 보는 클러스터 구조    \textbf{5.3} Pods, Deployments, Services — 서빙에 쓰는 세 가지 객체    \textbf{5.4} requests, limits, QoS: 제3장의 자원 한도를 클러스터에 적용하기    \textbf{5.5} GPU와 스케줄러    \textbf{5.6} 증상으로 찾는 파드 장애의 원인    \textbf{5.7} 실습 · 모델 서버 오케스트레이션 — 이어서 요약, 연습문제, 더 읽을거리.
 \end{calloutbox}
 
 \vspace{3.0pt}
@@ -36,9 +36,9 @@
 제3장과 마찬가지로 이 장은 \textbf{터미널을 옆에 두고 읽도록} 썼다. GPU 예시만 관리형 GPU 노드 풀에서 실행했을 뿐, 나머지 모든 터미널 기록은 노트북 클러스터에서 그대로 재현할 수 있다. 유일한 사전 준비는 \code{minikube start}(또는 kind)이며, GPU에서도 명령은 같고 하드웨어만 다르다. YAML 파일은 강의 저장소에 있지만, 한 번 직접 입력해 보는 편이 그냥 클론해 오는 것보다 훨씬 유익하다.
 \end{calloutbox}
 
-\section{제어 루프로서의 클러스터}
+\section{클러스터가 원하는 상태를 유지하는 원리}
 
-제4장은 만족스러운 결과물로 끝났다. 모델 서버를 이미지로 패키징해 레지스트리에 푸시했고, GPU 접근 방식도 디바이스 플러그인까지 이해했다. VM 한 대에서 \code{docker run} 한 번이면 서빙이 시작된다. 데모라면 이야기는 여기서 끝이다. 그러나 제1장의 실제 요구사항이 한꺼번에 밀려온다. 처리량을 높이고 한 번의 장애가 전체 중단으로 번지지 않게 하려면 \textbf{많은 레플리카}가 필요하다. \textbf{요청을 하나도 놓치지 않는 배포}도 필요하다(제3장의 SIGTERM 이야기가 이제 매주 되풀이된다). 사람이 깨어 있지 않은 \textbf{새벽 3시에 노드가 죽어도} 견뎌야 한다. 하드웨어 요구사항이 서로 다른 \textbf{20개 모델}을 청구서 하나를 함께 쓰며 운영해야 한다. 그리고 그 비용에서 가장 큰 몫을 차지하는 GPU가 단지 누군가 작업 배치를 잊었다는 이유로 놀아서는 안 된다.
+제4장에서 만든 이미지는 VM 한 대에 \code{docker run} 한 번이면 띄울 수 있다. GPU를 컨테이너에 연결하는 디바이스 플러그인도 살펴봤다. 데모는 그것으로 충분했다. 서비스를 계속 운영하려면 제1장의 질문에 답해야 한다. \textbf{레플리카를 여러 개} 두어 처리량을 늘리고, 하나가 고장 나도 나머지는 요청을 받게 하려면 어떻게 할까? \textbf{요청을 놓치지 않고 새 버전을 배포}하려면 제3장에서 본 SIGTERM을 어떻게 다뤄야 할까? \textbf{새벽 3시에 노드가 멈췄는데} 깨어 있는 사람이 없다면? 필요한 하드웨어가 제각각인 \textbf{모델 20개}를 한 예산으로 운영하면서 비싼 GPU를 놀리지 않을 방법도 필요하다.
 
 이 모든 일을 스크립트로 처리할 수도 있다. 2014년 무렵에는 모두가 그랬다. SSH를 순회하는 bash 루프, 헬스 엔드포인트에 curl을 보내 실패한 프로세스를 재시작하는 cron 작업, 어느 모델이 어디서 실행되는지 적어 둔 위키 페이지가 있었다. 이런 스크립트를 현실의 요구에 맞춰 키우다 보면 결국 한 형태로 수렴한다. \textbf{무엇이 실행되어야 하는지 기술한 파일, 그 파일과 현재 실행 상태를 비교하는 루프, 둘 사이의 차이를 없애는 동작}이다. Kubernetes는 이 형태를 산업 수준으로 다듬은 시스템이다. Kubernetes가 이를 외부 세계에 공개하기 전, Google의 내부 시스템 Borg는 바로 이 아이디어로 10년간 운영되었다. 이 형태를 이해하면 나머지는 세부 사항일 뿐이다.
 
@@ -73,13 +73,13 @@ model-server-7d4b9c6f5-fh5m8    1/1     Running   0          4s
 
 \subsection*{새벽 3시에는 선언형이 명령형을 이긴다}
 
-이 차이에는 이름이 있다. \textbf{명령형(imperative)} 시스템은 "서버 세 대를 시작하라" 같은 지시를 받는다. 지시는 한 번 실행되고 나면 시간이 갈수록 효력이 사라진다. 나중에 서버가 죽어도 지시는 이미 끝났으므로, 누군가 이를 발견해 새 지시를 내려야 한다. \textbf{선언형(declarative)} 시스템은 "서버 세 대가 존재한다"라는 \textit{불변 조건}을 유지한다. 불변 조건은 효력을 잃지 않는다. 계속해서 다시 확인하고 강제하므로 "X가 실패하면 어떻게 되는가?"라는 질문의 답은 언제나 같다. \textit{루프가 알아채고 다시 수렴한다.} 가정용 온도조절기도 같은 원리다. 21°C를 선언하면 누군가 창문을 열 때마다 선언을 반복하지 않아도 된다. 서빙 플릿에 꼭 필요한 성질이 바로 이것이다. 새벽 3시의 노드 장애, 실수로 누른 삭제, 플릿을 절반으로 줄여 버린 배포는 루프의 눈에는 모두 똑같은 편차다.
+이 차이에는 이름이 있다. \textbf{명령형(imperative)} 시스템은 "서버 세 대를 시작하라" 같은 지시를 받는다. 지시는 한 번 실행되고 나면 시간이 갈수록 효력이 사라진다. 나중에 서버가 죽어도 지시는 이미 끝났으므로, 누군가 이를 발견해 새 지시를 내려야 한다. \textbf{선언형(declarative)} 시스템은 "서버 세 대가 존재한다"라는 \textit{불변 조건}을 유지한다. 불변 조건은 효력을 잃지 않는다. 계속해서 다시 확인하고 강제하므로 "X가 실패하면 어떻게 되는가?"라는 질문의 답은 언제나 같다. \textit{루프가 알아채고 다시 수렴한다.} 가정용 온도조절기도 같은 원리다. 21°C를 선언하면 누군가 창문을 열 때마다 선언을 반복하지 않아도 된다. 서빙 서버군에 꼭 필요한 성질이 바로 이것이다. 새벽 3시의 노드 장애, 실수로 누른 삭제, 서버군을 절반으로 줄여 버린 배포는 루프의 눈에는 모두 똑같은 편차다.
 
-선언형 습관은 이 책 뒤쪽에서도 복리처럼 이익을 낸다. 12주 차에 오토스케일링을 추가해도 오토스케일러는 전혀 새로운 종류의 장치가 아니다. 부하가 커지면 \code{replicas: 3}을 \code{replicas: 7}로 바꾸고 나머지는 이 절의 루프에 맡기는 \textbf{또 하나의 원하는 상태 작성자}일 뿐이다. 13주 차에 CI/CD로 배포를 자동화할 때도 파이프라인의 마지막 동작은 객체 한 줄을 바꾸는 것이다. 이 책의 운영 파트에서 일어나는 모든 일은 사람이나 시스템이 명사를 편집하는 과정이며, 유일한 엔진은 그림 5-1의 루프다.
+원하는 상태를 선언하는 방식은 책 후반부에서도 그대로 쓰인다. 12주 차에 오토스케일링을 추가해도 오토스케일러는 전혀 새로운 종류의 장치가 아니다. 부하가 커지면 \code{replicas: 3}을 \code{replicas: 7}로 바꾸고 나머지는 이 절의 루프에 맡기는 \textbf{원하는 레플리카 수를 갱신하는 컨트롤러}일 뿐이다. 13주 차에 CI/CD로 배포를 자동화할 때도 파이프라인의 마지막 동작은 객체 한 줄을 바꾸는 것이다. 이 책의 운영 파트에서 일어나는 모든 일은 사람이나 시스템이 객체에 원하는 상태를 적으면 그림 5-1의 루프가 실제 상태를 거기에 맞추는 과정이다.
 
 \subsection*{이 장이 실제로 다루는 것}
 
-서빙 엔지니어에게 Kubernetes는 네 가지 높이에서 중요하며, 이 장은 각 층을 차례로 살펴본다. 가장 위의 \textbf{제어 루프}(이 절)는 앞으로 마주칠 모든 실패 상황에서 시스템이 어떻게 움직이는지 설명한다. 한 층 아래의 \textbf{객체}, 즉 Pod, Deployment, Service(§5.3)는 모델 서버를 기술하고 상태를 확인하며 안정적인 주소를 부여하는 어휘다. 그 아래의 \textbf{리소스와 QoS}(§5.4)는 제3장의 cgroup 벽을 플릿 규모로 대신 작성하는 곳이다. 이제 자다가도 설명할 수 있는 OOM 동작도 여기에 포함된다. 가장 아래에서는 \textbf{스케줄러}(§5.5)가 어떤 값비싼 GPU에서 어떤 모델을 실행할지 결정한다. 매달 청구서로 결과가 드러나는 배치 문제다. 마지막으로 §5.6에서는 이 전체 스택을 실제 업무에서 쓰이는 형태, 즉 체계적인 진단법으로 바꾼다.
+서빙을 운영하려면 Kubernetes가 하는 일을 네 층으로 나눠 보면 좋다. 가장 위의 \textbf{제어 루프}(이 절)는 앞으로 마주칠 모든 실패 상황에서 시스템이 어떻게 움직이는지 설명한다. 한 층 아래의 \textbf{객체}, 즉 Pod, Deployment, Service(§5.3)는 모델 서버를 기술하고 상태를 확인하며 안정적인 주소를 부여하는 어휘다. 그 아래의 \textbf{리소스와 QoS}(§5.4)는 제3장에서 직접 설정한 cgroup 한도를 여러 노드에 적용하는 방법을 정한다. 파드가 메모리 한도를 넘으면 여기서도 OOM이 발생한다. 가장 아래에서는 \textbf{스케줄러}(§5.5)가 어떤 값비싼 GPU에서 어떤 모델을 실행할지 결정한다. 매달 청구서로 결과가 드러나는 배치 문제다. 마지막으로 §5.6에서는 이 전체 스택을 실제 업무에서 쓰이는 형태, 즉 체계적인 진단법으로 바꾼다.
 
 \begin{calloutbox}{tbbpurple}{tbbpurplefill}
 {\normalsize\bfseries\color{tbbpurple}생각해 보기}\par\vspace{3pt}
@@ -90,16 +90,16 @@ model-server-7d4b9c6f5-fh5m8    1/1     Running   0          4s
 \end{tbbitemize}
 \end{calloutbox}
 
-\section{구조: 자기주장이 있는 데이터베이스}
+\section{etcd와 제어 루프로 보는 클러스터 구조}
 
-신비감을 걷어 내면 Kubernetes의 아키텍처는 한 문장으로 정리된다. \textbf{앞에는 API(API 서버)가 있고 뒤에는 수많은 제어 루프(컨트롤러, 스케줄러, 노드마다 하나씩 있는 kubelet)가 붙은 데이터베이스(etcd)}다. 나머지는 모두 부연 설명이다. 그림 5-2는 구성 요소를 한눈에 펼쳐 보인다. 이 절에서는 각 요소를 하나씩 설명한 뒤, 한 번의 \code{kubectl apply}가 모든 요소를 통과하는 과정을 추적한다. 실제로 디버깅하는 대상은 개별 부품이 아니라 이 연결 고리이기 때문이다.
+그림 5-2의 가운데에 \textbf{클러스터 상태를 기록하는 데이터베이스 etcd}가 있다. 그 앞에는 API 서버가 있고, 컨트롤러와 스케줄러, 노드별 kubelet은 API 서버를 통해 상태를 읽고 각자 맡은 일을 한다. 먼저 구성 요소의 역할을 살펴본 뒤 \code{kubectl apply} 한 번이 어떤 경로를 거쳐 실제 파드를 띄우는지 따라가 보자. 장애가 나면 그 경로 어디에서 일이 멈췄는지 찾아야 한다.
 
 \begin{tbbfigure}
   \adjustbox{max width=0.94\linewidth,max totalheight=0.46\textheight}{\includegraphics{figures/fig5-2_architecture.png}}\\[3pt]
   \figcaption{그림 5-2  클러스터 구조. 컨트롤 플레인은 원하는 상태를 저장하고 조정한다. 각 노드의 kubelet은 제4장의 런타임 스택을 거쳐 파드를 현실로 만들며, 그 끝에는 제3장의 네임스페이스와 cgroup이 있다.}
 \end{tbbfigure}
 
-\subsection*{컨트롤 플레인: 구성 요소별 한 문단}
+\subsection*{컨트롤 플레인의 구성 요소와 역할}
 
 \textbf{API 서버}는 유일한 출입구다. kubectl을 사용하는 사람, 모든 컨트롤러, 모든 kubelet은 오직 API 서버하고만 통신한다. 그 외에는 아무것도 etcd에 접근할 수 없다. API 서버는 인증하고 권한을 확인하며 유효성을 검사한 뒤, 다소 싱거울 만큼 단순한 일을 한다. 객체에 CRUD를 수행한다. 내부에 숨겨진 오케스트레이션 두뇌는 없다. 출력 상세도를 높이면 \code{kubectl}조차 얇은 REST 클라이언트일 뿐이라는 사실이 드러난다.
 
@@ -124,7 +124,9 @@ kube-proxy-b47rl                   1/1     Running   0             9d
 
 \textbf{스케줄러}는 역할이 매우 좁은 중매자다. 아직 노드가 배정되지 않은 파드를 지켜보다가, 각 파드에 가장 적합한 노드를 고르고(먼저 필터링하고 점수를 매기는 과정은 GPU 때문에 흥미로워지는 §5.5에서 해부한다), 그 선택을 파드 객체에 다시 기록한다. 하는 일은 이것뿐이다. 아무것도 시작하지 않고 어떤 노드도 직접 건드리지 않는다. \textbf{컨트롤러 매니저}는 §5.1의 조정 루프들을 실행한다. Deployment 컨트롤러, ReplicaSet 컨트롤러, 죽은 노드를 알아채는 노드 수명 주기 컨트롤러를 비롯한 수십 개의 루프가 있으며, 각 루프는 한 객체 유형을 대상으로 "관찰하고, 차이를 찾고, 동작하는" 작은 과정이다.
 
-모든 노드에서 \textbf{kubelet}은 손발 역할을 한다. API 서버를 지켜보다가 \textit{자기} 노드에 바인딩된 파드를 현실로 만든다. 제4장의 containerd → runc 스택 앞에 놓인 gRPC 인터페이스인 CRI를 통해 컨테이너 런타임에 지시하고, 볼륨을 마운트하며, §5.3의 프로브를 실행하고, 상태를 다시 보고한다. 메모리 압박이 생기면 §5.4의 퇴거도 수행한다. 이 설명에서 kubelet이 누구인지 눈여겨보자. 바로 \textbf{제3장이 계속 예고했던 대필자}다. 파드가 \code{limits.memory: 1.75Gi}를 선언하면, 런타임을 거쳐 \code{memory.max} 파일에 \code{1879048192}가 나타나게 만드는 주체가 kubelet이다. 그 옆에는 §5.3의 Service NAT를 프로그래밍하는 \textbf{kube-proxy}가 실행된다. GPU 노드에서는 제4장의 \textbf{디바이스 플러그인}도 함께 실행되어 GPU가 몇 개 있고 어느 것이 비어 있는지 kubelet에 알려 준다.
+모든 노드에서 \textbf{kubelet}은 손발 역할을 한다. API 서버를 지켜보다가 \textit{자기} 노드에 배정된 파드가 실제로 실행되도록 한다. 제4장의 containerd → runc 스택 앞에 놓인 gRPC 인터페이스인 CRI를 통해 컨테이너 런타임에 지시하고, 볼륨을 마운트하며, §5.3의 프로브를 실행하고, 상태를 다시 보고한다. 메모리 압박이 생기면 §5.4의 퇴거도 수행한다.
+
+제3장에서 cgroup 설정 파일을 \textbf{누가 써 주는지} 물었다. 그 과정은 kubelet에서 시작한다. 파드가 \code{limits.memory: 1.75Gi}를 선언하면, 런타임을 거쳐 \code{memory.max} 파일에 \code{1879048192}가 나타나게 만드는 주체가 kubelet이다. 그 옆에는 §5.3의 Service NAT를 프로그래밍하는 \textbf{kube-proxy}가 실행된다. GPU 노드에서는 제4장의 \textbf{디바이스 플러그인}도 함께 실행되어 GPU가 몇 개 있고 어느 것이 비어 있는지 kubelet에 알려 준다.
 
 \subsection*{한 번의 apply를 처음부터 끝까지}
 
@@ -134,11 +136,13 @@ kube-proxy-b47rl                   1/1     Running   0             9d
   \item \textbf{1 — 저장.} API 서버가 Deployment 객체의 유효성을 검사하고 etcd에 기록한다. 아직 아무것도 실행되지 않았다. 데이터베이스의 한 행만 바뀌었다.
   \item \textbf{2 — 확장.} Deployment 컨트롤러는 일치하는 ReplicaSet이 없는 Deployment를 발견하고 하나를 만든다(이번에도 객체다). ReplicaSet 컨트롤러는 원하는 수가 3인데 실제 수가 0임을 알아채고, \code{nodeName}이 비어 있는 Pod 객체 세 개를 만든다.
   \item \textbf{3 — 배치.} 스케줄러는 노드에 바인딩되지 않은 파드 세 개를 발견하고, 파드마다 필터링과 점수 계산을 거쳐 노드 이름을 기록한다. 여전히 어느 곳에서도 아무것도 실행되지 않았다.
-  \item \textbf{4 — 실체화.} 선택된 각 노드의 kubelet은 자신에게 바인딩된 파드를 발견한다. 이미지가 없으면 가져오고(제3장에서 계산한 25–60 s의 콜드 pull 시간이 노드마다 적용된다), containerd → runc를 구동해 pause 컨테이너와 서버 컨테이너를 만든다. 분리된 네임스페이스, 작성된 cgroup 파일, 마운트된 overlayfs까지 제3장의 다섯 단계을 시스템이 수행한다.
+  \item \textbf{4 — 실체화.} 선택된 각 노드의 kubelet은 자신에게 바인딩된 파드를 발견한다. 이미지가 없으면 가져오고(제3장에서 계산한 25–60 s의 콜드 pull 시간이 노드마다 적용된다), containerd → runc를 구동해 pause 컨테이너와 서버 컨테이너를 만든다. 분리된 네임스페이스, 작성된 cgroup 파일, 마운트된 overlayfs까지 제3장의 다섯 단계를 시스템이 수행한다.
   \item \textbf{5 — 보고.} kubelet이 상태를 다시 게시하고 프로브가 시작된다. 준비 상태 검사를 통과하면 파드의 IP가 Service 엔드포인트(§5.3)에 들어가고 트래픽이 흐른다.
 \end{tbbitemize}
 
-이 연결 고리에서 두 가지는 특히 강조할 가치가 있다. 첫째, \textit{Kubernetes라는 이름의 무언가가 컨테이너를 실행한 것이 아니다.} 실행은 runc가 했고, Kubernetes는 위치를 결정하고 상태를 기록했다. 제3장이 컨테이너의 신비를 걷어 냈다면, 이 절은 오케스트레이터의 신비를 걷어 낸다. 같은 커널 메커니즘 주위에서 장부를 관리할 뿐이다. 둘째, \textit{연결 고리의 모든 화살표는 API 서버에 대한 watch다.} 구성 요소끼리는 서로 호출하지 않는다. 이처럼 철저히 분리했기 때문에 어느 한 구성 요소가 멈춰도 시스템이 견딘다. 작업은 etcd에서 기다리고, 재개한 구성 요소가 가져가면 된다. (또한 컨트롤 플레인에 문제가 생겨도 데이터 플레인이 계속 서빙한다는 뜻이다. 이미 실행 중인 파드, 이미 프로그래밍된 Service 경로, 이미 작성된 cgroup 파일은 계속 동작하는 데 허가가 필요 없다. 컨트롤 플레인이 돌아올 때까지 아무것도 \textit{변경}하지 못할 뿐이다.)
+이 과정에서 두 가지를 짚고 넘어가자. 첫째, \textit{Kubernetes라는 이름의 무언가가 컨테이너를 실행한 것이 아니다.} 실행은 runc가 했고, Kubernetes는 위치를 결정하고 상태를 기록했다. 제3장이 컨테이너의 신비를 걷어 냈다면, 이 절은 오케스트레이터의 신비를 걷어 낸다. 같은 커널 메커니즘 주위에서 장부를 관리할 뿐이다.
+
+둘째, \textit{연결 고리의 모든 화살표는 API 서버에 대한 watch다.} 구성 요소끼리는 서로 호출하지 않는다. 이처럼 철저히 분리했기 때문에 어느 한 구성 요소가 멈춰도 시스템이 견딘다. 작업은 etcd에서 기다리고, 재개한 구성 요소가 가져가면 된다. (또한 컨트롤 플레인에 문제가 생겨도 데이터 플레인이 계속 서빙한다는 뜻이다. 이미 실행 중인 파드, 이미 프로그래밍된 Service 경로, 이미 작성된 cgroup 파일은 계속 동작하는 데 허가가 필요 없다. 컨트롤 플레인이 돌아올 때까지 아무것도 \textit{변경}하지 못할 뿐이다.)
 
 \begin{calloutbox}{tbbpurple}{tbbpurplefill}
 {\normalsize\bfseries\color{tbbpurple}생각해 보기}\par\vspace{3pt}
@@ -149,9 +153,9 @@ kube-proxy-b47rl                   1/1     Running   0             9d
 \end{tbbitemize}
 \end{calloutbox}
 
-\section{Pods, Deployments, Services — 서빙의 세 축}
+\section{Pods, Deployments, Services — 서빙에 쓰는 세 가지 객체}
 
-이 책에서 실행할 거의 모든 서빙 워크로드는 세 객체가 떠받친다. \textbf{Pod}는 서버와 보조 컨테이너를 묶는 실행 단위다. \textbf{Deployment}는 개수, 버전, 업그레이드 방식을 관리하는 플릿 관리자다. \textbf{Service}는 언젠가 사라질 레플리카 앞에 하나의 이름을 제공하는 안정적인 주소다. 이 세 가지를 깊이 이해하면 앞으로 만날 Kubernetes YAML 대부분이 그 변형으로 보인다.
+이 책에서 다룰 서빙 워크로드 대부분은 객체 세 종류로 구성한다. \textbf{Pod}에는 모델 서버와 함께 돌아갈 보조 컨테이너를 담는다. \textbf{Deployment}에는 파드를 몇 개 띄울지, 어떤 버전을 쓸지, 업데이트할 때 어떻게 교체할지 적는다. \textbf{Service}는 파드가 새로 뜨고 사라져도 클라이언트가 같은 이름과 주소로 접속할 수 있게 해 준다. 앞으로 보게 될 Kubernetes YAML 대부분에 이 셋이 등장한다.
 
 \subsection*{먼저 워크로드의 형태부터: 마이크로서비스 개요}
 
@@ -174,7 +178,7 @@ kube-proxy-b47rl                   1/1     Running   0             9d
 
 \vspace{3.0pt}
 
-마지막 문장이 이 장의 존재 이유를 설명한다. MSA가 만드는 운영 부담은 도입 조직마다 거의 같다. 그래서 산업화할 수 있었고, 그 산업화의 결과가 Kubernetes다. 아래의 세 축을 \textbf{마이크로서비스 입문 키트}로 보자. 배포 단위인 Pod, 서비스별 플릿 관리자인 Deployment, 그리고 서비스 발견과 로드 밸런싱(load balancing)을 제공하는 Service(서비스마다 DNS 이름 하나)다. 사실 이 스타일을 직접 선택한 것도 아니다. \textbf{AI 서빙 시스템은 태어날 때부터 작은 MSA다.} 앞에는 CPU 비용이 낮은 API 게이트웨이가 있고(작은 레플리카가 많으며 매주 출시), 뒤에는 모델마다 GPU 비용이 큰 모델 서버가 있으며(레플리카가 적고 모델 버전이 바뀔 때마다 재배포 — 13주 차), 각자 병목에 맞춰 확장하는 전처리기, 후처리기, 익스포터(exporter)가 따라붙는다. 서로 다른 하드웨어, 확장 방식, 출시 주기는 마이크로서비스가 존재하는 바로 그 조건이다. 책 나머지 전체에 통하는 경험 법칙은 \textbf{마이크로서비스 하나 = Deployment 하나 + Service 하나}다. 9주 차의 서빙 프레임워크는 이를 "model-as-a-service"로 가정하고, 12주 차의 KServe는 이를 형식화하며, 14주 차의 관측 가능성 스택은 바로 이 구조 때문에 존재한다.
+마지막 문장이 이 장의 존재 이유를 설명한다. MSA가 만드는 운영 부담은 도입 조직마다 거의 같다. 그래서 산업화할 수 있었고, 그 산업화의 결과가 Kubernetes다. 아래의 세 축을 \textbf{마이크로서비스 입문 키트}로 보자. 배포 단위인 Pod, 서비스별 서버군 관리자인 Deployment, 그리고 서비스 발견과 로드 밸런싱(load balancing)을 제공하는 Service(서비스마다 DNS 이름 하나)다. 사실 이 스타일을 직접 선택한 것도 아니다. \textbf{AI 서빙 시스템은 태어날 때부터 작은 MSA다.} 앞에는 CPU 비용이 낮은 API 게이트웨이가 있고(작은 레플리카가 많으며 매주 출시), 뒤에는 모델마다 GPU 비용이 큰 모델 서버가 있으며(레플리카가 적고 모델 버전이 바뀔 때마다 재배포 — 13주 차), 각자 병목에 맞춰 확장하는 전처리기, 후처리기, 익스포터(exporter)가 따라붙는다. 서로 다른 하드웨어, 확장 방식, 출시 주기는 마이크로서비스가 존재하는 바로 그 조건이다. 책 나머지 전체에 통하는 경험 법칙은 \textbf{마이크로서비스 하나 = Deployment 하나 + Service 하나}다. 9주 차의 서빙 프레임워크는 이를 "model-as-a-service"로 가정하고, 12주 차의 KServe는 이를 형식화하며, 14주 차의 관측 가능성 스택은 바로 이 구조 때문에 존재한다.
 
 \subsection*{Pod: 스케줄링과 공유의 단위}
 
@@ -189,7 +193,7 @@ kube-proxy-b47rl                   1/1     Running   0             9d
 
 \subsection*{실제로 작성할 매니페스트}
 
-실습 모델 서버의 전체 Deployment 매니페스트다. §5.4와 §5.6이 각각 여기의 한 구절을 바탕으로 절 하나를 전개하므로, 한 줄씩 읽어 볼 가치가 있다.
+실습 모델 서버의 전체 Deployment 매니페스트다. 자원 한도를 다루는 §5.4와 장애를 진단하는 §5.6에서도 이 설정을 다시 살펴본다.
 
 \begin{terminalbox}
 \begin{Verbatim}[breaklines=true,breakanywhere=true,fontsize=\small,formatcom=\color{tbbtermfg},codes=\tbbcodeactive]
@@ -249,7 +253,7 @@ kubelet은 모든 컨테이너에 세 가지 질문을 계속 던진다. 서빙 
 
 이제 대표적인 서빙 사고를 한 문장으로 설명할 수 있다. 기본 대기 시간으로 설정된 활성 상태 프로브가 모델 로딩에 90초가 걸리는 서버를 검사하면, 로딩 중인 컨테이너를 영원히 죽인다. \textbf{아무 문제가 없는 이미지에서 CrashLoopBackOff가 발생한다.} 실제 현장에서 틀림없이 만날 문제이므로 §5.6에서 터미널 기록과 함께 전체 사고를 재현한다. 예방책은 위의 startupProbe 설정이고, 진단 습관은 터미널 기록 5-4의 구분이다. Running은 Ready가 아니며, 어느 쪽도 죽었다는 뜻은 아니다.
 
-\subsection*{Deployment: 버전이 있는 플릿과 무중단 롤아웃}
+\subsection*{Deployment: 버전이 있는 서버군과 무중단 롤아웃}
 
 Deployment는 파드 템플릿 버전마다 하나씩 존재하는 ReplicaSet을 관리한다(템플릿 해시는 터미널 기록 5-1의 파드 이름에 그대로 나타난다). 새 이미지 태그나 새 메모리 상한처럼 템플릿의 무엇이든 바꾸면 Deployment는 \textit{새} ReplicaSet을 만들고 정해진 속도로 기존 파드와 새 파드를 교대한다. 속도는 전환 중 추가로 존재할 수 있는 수를 뜻하는 \code{maxSurge}와 비어 있어도 되는 수를 뜻하는 \code{maxUnavailable}이 결정한다. 서빙에 적합한 설정은 \code{maxSurge: 1, maxUnavailable: 0}이다. 용량을 절대 떨어뜨리지 않고, 하나를 추가해 \textbf{Ready}가 될 때까지 기다린 뒤 하나를 제거한다. 여기서 "Ready가 될 때까지 기다린다"는 문구가 핵심이다. \textbf{롤아웃의 속도는 준비 상태가 결정한다.} 새 버전이 끝내 준비 상태가 되지 않으면 추가 파드 하나에서 롤아웃이 멈춘다. 기존 버전은 계속 서빙하고 장애 영향 범위는 파드 하나로 제한된다. 시스템이 조용히 사용자의 실수로부터 사용자를 구해 주는 셈이다.
 
@@ -276,7 +280,7 @@ $ kubectl rollout undo deployment/model-server
 
 \subsection*{Service: 사라질 파드 앞에 놓는 안정적인 이름 하나}
 
-파드는 가축과 같다. 태어날 때 IP를 받고 죽을 때 잃는다. 터미널 기록 5-5에서 죽음이 얼마나 일상적인지 보았다. 클라이언트에게 이를 일일이 따라가라고 할 수는 없다. 해결책은 \textbf{Service}다. 현재 \textbf{레이블 셀렉터(selector)}와 일치하면서 준비 상태 검사를 통과한 파드 앞에 안정적인 가상 IP와 DNS 이름(\code{model-svc.ml.svc.cluster.local}, CoreDNS가 제공)을 둔다. 일치하는 파드의 IP가 \textbf{엔드포인트} 목록을 구성하고 컨트롤러가 이를 실시간으로 갱신한다. \textbf{kube-proxy}는 가상 IP로 들어온 연결을 정상 백엔드 하나로 DNAT 변환하도록 노드의 패킷 경로(iptables 또는 IPVS)를 프로그래밍한다. 제3장의 \code{-p 8080:8000} 패킷 경로에서 정확히 같은 메커니즘을 만났다. 공개 포트는 NAT 규칙 하나였고, Service는 같은 기법을 클러스터 전체에 건강 상태를 반영해 적용한다(그림 5-4). MSA 관점에서는 \textbf{플랫폼이 해결한 서비스 디스커버리}다. 소비자는 이름만 알 뿐 토폴로지는 알 필요가 없다.
+파드는 교체될 때마다 IP가 달라질 수 있다. 터미널 기록 5-5에서 보았듯 배포할 때도 이런 교체가 자주 일어난다. 클라이언트가 매번 새 IP를 찾아야 한다면 곤란하다. 해결책은 \textbf{Service}다. 현재 \textbf{레이블 셀렉터(selector)}와 일치하면서 준비 상태 검사를 통과한 파드 앞에 안정적인 가상 IP와 DNS 이름(\code{model-svc.ml.svc.cluster.local}, CoreDNS가 제공)을 둔다. 일치하는 파드의 IP가 \textbf{엔드포인트} 목록을 구성하고 컨트롤러가 이를 실시간으로 갱신한다. \textbf{kube-proxy}는 가상 IP로 들어온 연결을 정상 백엔드 하나로 DNAT 변환하도록 노드의 패킷 경로(iptables 또는 IPVS)를 프로그래밍한다. 제3장의 \code{-p 8080:8000} 패킷 경로에서 정확히 같은 메커니즘을 만났다. 공개 포트는 NAT 규칙 하나였고, Service는 같은 기법을 클러스터 전체에 건강 상태를 반영해 적용한다(그림 5-4). MSA 관점에서는 \textbf{플랫폼이 해결한 서비스 디스커버리}다. 소비자는 이름만 알 뿐 토폴로지는 알 필요가 없다.
 
 \begin{tbbfigure}
   \adjustbox{max width=0.94\linewidth,max totalheight=0.46\textheight}{\includegraphics{figures/fig5-4_deploy_svc.png}}\\[3pt]
@@ -300,7 +304,7 @@ $ curl -s http://model-svc.default/predict -d '{"x": [1,2]}'
 {"y": 0.87, "model": "v7"}
 \end{Verbatim}
 \end{terminalbox}
-\figcaption{터미널 기록 5-6  플릿 앞에 놓인 Service. 가상 IP, DNS 이름, 준비 상태 프로브에 응답하는 파드만 담는 엔드포인트 목록을 제공한다.}
+\figcaption{터미널 기록 5-6  서버군 앞에 놓인 Service. 가상 IP, DNS 이름, 준비 상태 프로브에 응답하는 파드만 담는 엔드포인트 목록을 제공한다.}
 
 세 가지 Service 유형은 노출 범위를 단계적으로 넓힌다. \textbf{ClusterIP}(위 예시의 기본값)는 클러스터 내부에서만 접근할 수 있어 다른 서비스 뒤에 놓인 모델 서버에 적합하다. \textbf{NodePort}는 모든 노드에서 높은 번호의 포트(30000–32767)를 연다. minikube 실습에서 외부로 나가는 방법이다. \textbf{LoadBalancer}는 해당 노드 포트에 연결된 실제 외부 로드 밸런서를 클라우드에 요청한다. 관리형 클러스터에서 쓰는 방식이며, 6주 차에는 앞단에 API 게이트웨이, TLS, 인증을 추가한다. 지금 기억할 점이 하나 있다. Service는 요청이 아니라 \textit{연결}을 로드 밸런싱한다. 스트리밍이나 gRPC 멀티플렉싱처럼 오래 유지되는 연결은 이를 무력화할 수 있으며, 이 문제는 11주 차 LLM 스트리밍에서 다시 등장한다.
 
@@ -315,16 +319,16 @@ $ curl -s http://model-svc.default/predict -d '{"x": [1,2]}'
 \end{tbbitemize}
 \end{calloutbox}
 
-\section{requests, limits, QoS: 플릿 규모로 확장한 제3장}
+\section{requests, limits, QoS: 제3장의 자원 한도를 클러스터에 적용하기}
 
-터미널 기록 5-3의 \code{resources:} 구절은 여덟 줄에 불과하지만, 나머지 매니페스트 전체를 합친 것보다 운영상 중요하다. 이해하기 까다로운 핵심은 \textbf{서로 다른 두 가지 일을 하는 두 시스템이 이 구절을 읽는다}는 점이다(그림 5-5). 배치 시점에 \textit{스케줄러}는 \textbf{requests}를 산술 값으로 읽는다. 노드의 \textbf{allocatable} 용량에서 이미 배치된 requests의 합을 빼고도 새 파드의 requests를 감당할 수 있으면 파드가 들어간다. requests는 그저 계획을 위한 숫자다. \textbf{런타임에는 절대 강제되지 않는다.} 노드에 여유가 있으면 1 CPU를 요청한 파드가 3을 사용해도 된다. 반면 \textit{kubelet}이 읽는 \textbf{limits}는 제4장의 런타임 스택을 거쳐 제3장의 cgroup 파일로 정확히 변환되며, 커널이 매 밀리초마다 강제한다.
+터미널 기록 5-3의 \code{resources:}는 여덟 줄뿐이지만 파드를 어디에 놓을지부터 언제 멈출지까지 좌우한다. 그림 5-5에서 \textbf{누가 무엇을 읽는지} 먼저 보자. 배치할 때 \textit{스케줄러}는 노드의 \textbf{allocatable} 용량에서 기존 파드의 \textbf{requests}를 뺀다. 남은 용량이 새 파드의 요청량 이상이면 그 노드에 배치할 수 있다. 이 값은 \textbf{실행 중 사용량의 상한이 아니다}. CPU 1개를 요청한 파드도 노드에 여유가 있으면 3개를 쓸 수 있다. 반면 \textit{kubelet}이 읽는 \textbf{limits}는 제4장의 런타임을 거쳐 제3장에서 살펴본 cgroup 파일에 기록된다. 실행 중에 이 한도를 적용하는 주체는 커널이다.
 
 \begin{tbbfigure}
   \adjustbox{max width=0.94\linewidth,max totalheight=0.46\textheight}{\includegraphics{figures/fig5-5_requests_limits.png}}\\[3pt]
   \figcaption{그림 5-5  하나의 구절을 읽는 두 주체. requests는 스케줄러의 빈 패킹에 쓰이고, limits는 cpu.max와 memory.max가 된다. 둘 사이의 간격은 의도적인 오버커밋이며, 노드 압박이 시작되는 지점이기도 하다.}
 \end{tbbfigure}
 
-\subsection*{핵심을 증명하는 기록: YAML을 넣으면 cgroup 파일이 나온다}
+\subsection*{YAML에 적은 값이 cgroup 파일에 기록되는 과정}
 
 제3장은 호스트에서 Docker 컨테이너를 조사해 cgroup 파일이 연결된 프로세스를 찾아내며 시작했다. Kubernetes에서 같은 조사를 수행하면 이 장의 핵심 주장이 완성된다.
 
@@ -349,7 +353,7 @@ node-a $ cat cpu.weight
 \end{terminalbox}
 \figcaption{터미널 기록 5-7  연결 고리를 직접 완성했다. YAML의 limits는 노드의 memory.max와 cpu.max가 되었고, CPU 요청량은 cpu.weight가 되었다. Kubernetes는 제3장의 앞에 데이터베이스를 붙인 시스템이다.}
 
-세 파일을 제3장과 연결해 읽으면 모든 동작이 자연스럽게 따라 나온다. \code{memory.max = 1879048192}는 파드가 \textbf{같은 OOM 킬러, 같은 exit 137, 같은 dmesg의 자백, 같은 크기 산정법}을 만난다는 뜻이다. §3.6이 그대로 적용되고 \code{kubectl describe}에는 \code{Last State: OOMKilled}로 나타난다. \code{cpu.max = "200000 100000"}는 파드가 \textbf{버스트 중에 스로틀링될 수 있음}을 뜻한다. §3.3에서 인위적으로 만든 p99가 이제 YAML 한 줄로 설정된다. requests에서 파생된 \code{cpu.weight}는 경합이 있을 때만 영향을 주는, 정중하고 작업 보존적(work-conserving)인 지분이다. 기억해야 할 표는 다음과 같다.
+세 파일을 제3장과 연결해 읽으면 모든 동작이 자연스럽게 따라 나온다. \code{memory.max = 1879048192}는 파드가 \textbf{같은 OOM 킬러, 같은 exit 137, 같은 dmesg 기록, 같은 크기 산정법}을 만난다는 뜻이다. §3.6이 그대로 적용되고 \code{kubectl describe}에는 \code{Last State: OOMKilled}로 나타난다. \code{cpu.max = "200000 100000"}는 파드가 \textbf{버스트 중에 스로틀링될 수 있음}을 뜻한다. §3.3에서 인위적으로 만든 p99가 이제 YAML 한 줄로 설정된다. requests에서 파생된 \code{cpu.weight}는 경합이 있을 때만 영향을 주는, 남는 CPU 시간을 활용하는 작업 보존적(work-conserving)인 지분이다. 기억해야 할 표는 다음과 같다.
 
 \begin{tbbtablewrap}
   \begin{tabular}{@{}>{\raggedright\arraybackslash}m{\dimexpr 0.3085\tbltextwidth-2\tabcolsep\relax} >{\raggedright\arraybackslash}m{\dimexpr 0.3511\tbltextwidth-2\tabcolsep\relax} >{\raggedright\arraybackslash}m{\dimexpr 0.3404\tbltextwidth-2\tabcolsep\relax}@{}}
@@ -372,11 +376,11 @@ node-a $ cat cpu.weight
 
 \subsection*{CPU: request는 넉넉하게, limit는 신중하게}
 
-CPU에서 두 설정값은 제3장에서 본 서로 다른 두 성격을 이어받으며, 서빙 지침도 기계적으로 도출된다. request는 \textit{예약}이다. 배치 위치를 결정하고, \code{cpu.weight}를 통해 경합 중에는 비례 배분의 하한을 보장하면서도 이웃이 놀 때는 자원을 낭비하지 않는다. limit는 \code{cpu.max}라는 \textit{상한}이다. §3.3의 계산에서 상한이 꼬리 지연 시간에 미치는 영향을 보았다. CPU 시간 30 ms가 필요한 요청은 0.2-CPU 할당량 아래에서 110–190 ms가 걸리지만 프로파일러에는 원인이 보이지 않는다. 따라서 \textbf{CPU requests는 정직하게 설정}해야 한다. 이웃 워크로드 간섭이 있을 때 p99를 지키는 보험이기 때문이다. 반면 지연 시간에 민감한 파드에서는 \textbf{CPU limits를 신중하게 사용}해야 한다. 버스트를 흡수하는 데 쓰인 유휴 코어가 p99 구간에서 스로틀링되는 것보다 저렴하다. 다만 현실에는 두 가지 복잡한 점이 있다. 플랫폼 팀이 비용 관리와 폭주 방지를 위해 limits를 \textit{요구}할 때가 많고, 다음 문단에서 볼 Guaranteed QoS는 requests = limits를 요구한다. 일정한 성능과 QoS가 모두 필요한 팀은 두 값을 똑같이 넉넉하게 잡거나 kubelet의 정적 CPU 매니저 정책을 사용한다. 이 정책은 Guaranteed 등급의 정수-CPU 파드에 \textit{전용 코어}를 준다. 제2장의 전용 코어 개념이 kubelet에서 다시 등장한 것이다.
+CPU에서 두 설정값은 제3장에서 본 서로 다른 두 성격을 이어받으며, 서빙 지침도 기계적으로 도출된다. request는 \textit{예약}이다. 배치 위치를 결정하고, \code{cpu.weight}를 통해 경합 중에는 비례 배분의 하한을 보장하면서도 이웃이 놀 때는 자원을 낭비하지 않는다. limit는 \code{cpu.max}라는 \textit{상한}이다. §3.3의 계산에서 상한이 꼬리 지연 시간에 미치는 영향을 보았다. CPU 시간 30 ms가 필요한 요청은 0.2-CPU 할당량 아래에서 110–190 ms가 걸리지만 프로파일러에는 원인이 보이지 않는다. 따라서 \textbf{CPU requests는 실제 필요한 만큼 설정}해야 한다. 이웃 워크로드 간섭이 있을 때 p99를 지키는 보험이기 때문이다. 반면 지연 시간에 민감한 파드에서는 \textbf{CPU limits를 신중하게 사용}해야 한다. 버스트를 흡수하는 데 쓰인 유휴 코어가 p99 구간에서 스로틀링되는 것보다 저렴하다. 다만 현실에는 두 가지 복잡한 점이 있다. 플랫폼 팀이 비용 관리와 폭주 방지를 위해 limits를 \textit{요구}할 때가 많고, 다음 문단에서 볼 Guaranteed QoS는 requests = limits를 요구한다. 일정한 성능과 QoS가 모두 필요한 팀은 두 값을 똑같이 넉넉하게 잡거나 kubelet의 정적 CPU 매니저 정책을 사용한다. 이 정책은 Guaranteed 등급의 정수-CPU 파드에 \textit{전용 코어}를 준다. 제2장의 전용 코어 개념이 kubelet에서 다시 등장한 것이다.
 
-\subsection*{메모리: 간격, 압박, 두 번째 처형자}
+\subsection*{메모리가 부족할 때 파드를 종료하는 두 주체}
 
-메모리에서는 requests와 limits의 간격을 설명하는 별도 어휘가 필요하다. 스케줄러는 노드마다 Σrequests ≤ allocatable을 보장하지만 limits에는 관여하지 않으므로 \textbf{Σlimits가 노드 용량을 넘는 일은 흔하다.} 이것이 오버커밋이며 기능이다. 모두가 동시에 버스트하지는 않으리라는 가정 아래 누구나 버스트할 수 있게 한다. 이 가정이 틀리면, 예를 들어 여러 레플리카의 사용량이 함께 치솟으면(§3.6에서 보았듯 추론 메모리는 \textit{본질적으로 급격히 변한다}) 개별 파드가 자기 벽에 닿기 전에 \textbf{노드 자체}의 메모리가 부족해진다. 커널의 노드 수준 OOM 킬러에 맡기면 혼란스러우므로 Kubernetes는 질서를 택한다. \textbf{kubelet이 퇴거}를 수행한다. QoS 클래스와 requests 초과 사용량을 기준으로 희생 대상을 고르고 정상적으로 종료한 뒤 \code{Evicted}로 표시한다. 이제 서로 다른 두 처형자를 알게 되었다. 둘을 구별하는 능력은 §5.6의 핵심이다.
+메모리에서는 requests와 limits의 간격을 설명하는 별도 어휘가 필요하다. 스케줄러는 노드마다 Σrequests ≤ allocatable을 보장하지만 limits에는 관여하지 않으므로 \textbf{Σlimits가 노드 용량을 넘는 일은 흔하다.} 이것이 오버커밋이며 기능이다. 모두가 동시에 버스트하지는 않으리라는 가정 아래 누구나 버스트할 수 있게 한다. 이 가정이 틀리면, 예를 들어 여러 레플리카의 사용량이 함께 치솟으면(§3.6에서 보았듯 추론 메모리는 \textit{본질적으로 급격히 변한다}) 개별 파드가 자기 벽에 닿기 전에 \textbf{노드 자체}의 메모리가 부족해진다. 커널의 노드 수준 OOM 킬러에 맡기면 혼란스러우므로 Kubernetes는 질서를 택한다. \textbf{kubelet이 퇴거}를 수행한다. QoS 클래스와 requests 초과 사용량을 기준으로 희생 대상을 고르고 정상적으로 종료한 뒤 \code{Evicted}로 표시한다. 이제 서로 다른 두 종료 주체를 알게 되었다. 둘을 구별하는 능력은 §5.6의 핵심이다.
 
 \begin{tbbtablewrap}
   \begin{tabular}{@{}>{\raggedright\arraybackslash}m{\dimexpr 0.2340\tbltextwidth-2\tabcolsep\relax} >{\raggedright\arraybackslash}m{\dimexpr 0.3830\tbltextwidth-2\tabcolsep\relax} >{\raggedright\arraybackslash}m{\dimexpr 0.3830\tbltextwidth-2\tabcolsep\relax}@{}}
@@ -385,19 +389,19 @@ CPU에서 두 설정값은 제3장에서 본 서로 다른 두 성격을 이어�
   \arrayrulecolor{tbbnavy}\specialrule{0.7pt}{0pt}{2pt}
   {\textbf{발동 조건}} & {파드가 자기 memory.max를 초과} & {노드 메모리 부족(오버커밋 가정 실패)} \\
   \arrayrulecolor{tbbtableborder}\hline
-  {\textbf{처형자}} & {커널 OOM 킬러 — SIGKILL} & {kubelet — 파드를 정상 절차로 종료} \\
+  {\textbf{종료 주체}} & {커널 OOM 킬러 — SIGKILL} & {kubelet — 파드를 정상 절차로 종료} \\
   \arrayrulecolor{tbbtableborder}\hline
   {\textbf{영향 범위}} & {컨테이너 하나} & {QoS 순서에 따라 고른 희생 대상, 노드 전체} \\
   \arrayrulecolor{tbbtableborder}\hline
   {\textbf{징후}} & {\textcolor{tbbred}{OOMKilled · exit 137 · dmesg}} & {\textcolor{tbbpurple}{상태 Evicted · "노드 메모리가 부족함"}} \\
   \arrayrulecolor{tbbtableborder}\hline
-  {\textbf{우선 해결책}} & {최댓값에 맞춰 크기 조정 또는 배치 제한(§3.6)} & {정직한 requests, 서빙에 Guaranteed QoS 적용} \\
+  {\textbf{우선 해결책}} & {최댓값에 맞춰 크기 조정 또는 배치 제한(§3.6)} & {실제 사용량에 맞는 requests, 서빙에 Guaranteed QoS 적용} \\
   \arrayrulecolor{tbbnavy}\specialrule{1pt}{2pt}{0pt}
   \end{tabular}\par
-  \figcaption{표 5-2  두 처형자와 두 가지 징후}
+  \figcaption{표 5-2  프로세스를 종료하는 두 주체와 각각의 단서}
 \end{tbbtablewrap}
 
-\subsection*{QoS 클래스: 누가 먼저 죽을지도 설정이다}
+\subsection*{QoS 클래스에 따라 달라지는 종료 순서}
 
 kubelet의 퇴거 순서와, 그 단계까지 간다면 노드 OOM 킬러의 점수는 추측으로 정해지지 않는다. 플랫폼이 requests/limits 패턴에 따라 할당하는 제3장의 \code{oom\_score\_adj}다. 모든 컨테이너의 CPU와 메모리에서 requests = limits인 \textbf{Guaranteed}는 ≈ −997을 받아 거의 건드릴 수 없다. 아무것도 설정하지 않은 \textbf{BestEffort}는 +1000을 받아 언제나 가장 먼저 희생된다. 그 사이에 있는 \textbf{Burstable}은 사용량이 requests를 얼마나 초과했는지에 따라 점수가 달라진다. 서빙에 적용할 원칙은 명확하다. \textbf{모델 서버는 Guaranteed로 실행}해야 한다. 최소한 memory requests = limits로 맞춘다. 그러면 오버커밋된 노드가 압박을 받을 때 p99를 책임지는 파드가 아니라 배치 작업과 BestEffort 실험이 죽는다. (Kubernetes에는 이와 독립적인 두 번째 설정인 PriorityClass도 있다. 이는 \textit{워크로드 사이의 선점과 퇴거} 순서를 정하고, QoS는 \textit{한 노드에서 종료할 우선순위}를 정한다. 12주 차 오토스케일링에서는 둘 다 사용한다.)
 
@@ -410,7 +414,7 @@ kubelet의 퇴거 순서와, 그 단계까지 간다면 노드 OOM 킬러의 점
   \item \textbf{메모리 계산:} (29 − 0.5) / 1.2 ≈ 메모리 requests 기준으로 \textbf{레플리카 23개}가 들어간다.
 \end{tbbitemize}
 
-이 워크로드에서 노드는 \textbf{CPU가 병목}이다. 노드마다 레플리카 7개가 들어가고 메모리는 남는다. 따라서 메모리가 많은 인스턴스 유형에 비용을 더 내면 낭비다. 제1장의 비용 관점처럼 인스턴스는 제약이 되는 차원에 맞춰 골라야 한다. 이제 오버커밋 노출을 확인하자. 레플리카 7개 × limits = 14 vCPU 및 12.25 GiB다. CPU limits(14)는 allocatable(7.5)을 넘지만 합법이다. 동시에 버스트하면 requests에 비례해 cpu.weight가 분배하며, p99는 requests가 얼마나 정직한지에 달렸다. 메모리 limits(12.25 GiB)는 29 GiB보다 훨씬 작다. 이 패킹은 원리상 노드 메모리 압박을 일으킬 수조차 없으며, 서빙 노드에 의도적으로 적용한 보수적인 자세다.
+이 워크로드에서 노드는 \textbf{CPU가 병목}이다. 노드마다 레플리카 7개가 들어가고 메모리는 남는다. 따라서 메모리가 많은 인스턴스 유형에 비용을 더 내면 낭비다. 제1장의 비용 관점처럼 인스턴스는 제약이 되는 차원에 맞춰 골라야 한다. 이제 오버커밋 노출을 확인하자. 레플리카 7개 × limits = 14 vCPU 및 12.25 GiB다. CPU limits(14)는 allocatable(7.5)을 넘지만 합법이다. 동시에 버스트하면 requests에 비례해 cpu.weight가 분배하며, p99는 requests가 실제 사용량에 얼마나 가까운지에 달렸다. 메모리 limits(12.25 GiB)는 29 GiB보다 훨씬 작다. 이 패킹은 원리상 노드 메모리 압박을 일으킬 수조차 없으며, 서빙 노드에 의도적으로 적용한 보수적인 자세다.
 
 \code{cpu: 2, memory: 9Gi}를 요청하는 7B 매개변수 INT8 LLM 서버에 같은 계산을 적용해 보자. 이제 메모리가 제약이 되어 (29 − 0.5) / 9 = \textbf{레플리카 3개}가 들어가고, 적합한 노드 계열은 컴퓨팅 최적화에서 메모리 최적화로 바뀐다. 2분간 나눗셈만 해도 인스턴스 계열을 결정할 수 있다. 12주 차 FinOps 절은 바로 이 습관을 바탕으로 전체 비용 모델을 세운다.
 \end{calloutbox}
@@ -428,7 +432,7 @@ kubelet의 퇴거 순서와, 그 단계까지 간다면 노드 OOM 킬러의 점
 
 \section{GPU와 스케줄러}
 
-지금까지는 노드를 서로 바꿔 쓸 수 있다고 가정했다. GPU가 등장하는 순간 배치는 비용이 큰 결정으로 바뀐다. GPU 플릿을 잘 배치했을 때와 잘못 배치했을 때의 차이는 매달 수천 달러에 이른다. CPU와 달리 \textbf{GPU에는 오버커밋이 없으므로} 실수를 오버커밋으로 흡수할 수도 없다. 이 절에서는 가장 까다로운 사례인 GPU를 중심으로 스케줄러를 살펴본다.
+지금까지는 어느 노드에 파드를 놓아도 비용이 비슷했다. GPU가 달린 노드에서는 배치를 어떻게 하느냐에 따라 매달 수천 달러가 달라질 수 있다. CPU라면 여유분을 예상해 나눠 줄 수 있지만 \textbf{GPU는 기본적으로 오버커밋할 수 없다}. GPU의 사례를 따라가며 스케줄러가 배치할 노드를 어떻게 고르는지 살펴보자.
 
 \subsection*{필터링, 점수화, 바인딩 — 배치 과정 자체}
 
@@ -473,15 +477,15 @@ Allocated resources:
 
 \subsection*{배치 제어: 테인트는 밀어내고 어피니티는 끌어당긴다}
 
-두 가지 메커니즘이 특수 노드를 기준으로 파드의 위치를 유도하며, GPU 플릿에는 양방향 모두가 필요하다. 노드의 \textbf{테인트}는 이를 명시적으로 톨러레이션하지 않는 파드를 밀어낸다. 관리형 GPU 노드 풀에 \code{nvidia.com/\allowbreak gpu=present:NoSchedule} 테인트가 기본으로 붙는 이유는, CPU가 남았다는 이유만으로 무관한 로그 처리 Deployment가 시간당 \$3짜리 노드를 차지하지 못하게 하기 위해서다. \textbf{톨러레이션(toleration)}은 문을 열 뿐 파드를 특정 방향으로 보내지는 않는다. 방향은 레이블을 기준으로 한 \textbf{nodeSelector / 노드 어피니티}가 정한다. \code{gpu=t4}와 \code{gpu=a100}의 차이는 중요하다. 제2장의 플릿 표가 실제 비용으로 이어지기 때문이다. T4의 경제성을 기준으로 검증한 모델을 A100에서 실행하면 낭비일 수 있고, 10주 차의 양자화 모델은 모델마다 적합한 답을 바꾼다. 따라서 GPU 파드에는 톨러레이션(허가)과 어피니티(의도)가 모두 들어간다.
+두 가지 메커니즘이 특수 노드를 기준으로 파드의 위치를 유도하며, GPU 서버군에는 양방향 모두가 필요하다. 노드의 \textbf{테인트}는 이를 명시적으로 톨러레이션하지 않는 파드를 밀어낸다. 관리형 GPU 노드 풀에 \code{nvidia.com/\allowbreak gpu=present:NoSchedule} 테인트가 기본으로 붙는 이유는, CPU가 남았다는 이유만으로 무관한 로그 처리 Deployment가 시간당 \$3짜리 노드를 차지하지 못하게 하기 위해서다. \textbf{톨러레이션(toleration)}은 문을 열 뿐 파드를 특정 방향으로 보내지는 않는다. 방향은 레이블을 기준으로 한 \textbf{nodeSelector / 노드 어피니티}가 정한다. \code{gpu=t4}와 \code{gpu=a100}의 차이는 중요하다. 제2장의 서버군 표가 실제 비용으로 이어지기 때문이다. T4의 경제성을 기준으로 검증한 모델을 A100에서 실행하면 낭비일 수 있고, 10주 차의 양자화 모델은 모델마다 적합한 답을 바꾼다. 따라서 GPU 파드에는 톨러레이션(허가)과 어피니티(의도)가 모두 들어간다.
 
 \subsection*{패킹 대 분산: 스케줄링 정책도 비용 항목이다}
 
-상태 없는 CPU 플릿에서는 기본적인 점수 계산 원칙, 즉 파드를 분산하고 노드 부하를 고르게 유지하는 전략이 건전하다. 이웃 워크로드 간섭을 완화하고 노드 손실도 자연스럽게 견딘다. 하지만 GPU 플릿에서는 두 가지 방식으로 조용히 비용이 커진다. 첫째는 \textbf{단편화}다. 1-GPU 파드를 여러 노드에 흩으면 모든 노드가 일부만 사용된다. 나중에 다중 GPU 파드가 와도 여유 GPU가 충분한 단일 노드를 찾지 못해, 전체 여유 용량은 많은데도 Pending이 된다. 둘째는 \textbf{유휴 고립}이다. GPU가 없는 파드가 CPU나 메모리를 차지한 GPU 노드에서는 GPU가 비어 있고 비용도 내고 있지만 사용할 수 없다. 해결책은 코드가 아니라 정책이다. GPU 노드에 \textbf{빈 패킹} 점수(스케줄러의 MostAllocated 전략)를 적용해 사용 중인 노드는 채우고 빈 노드는 계속 비워 둔다. 그러면 12주 차의 클러스터 오토스케일러(cluster autoscaler)가 완전히 유휴 상태인 노드를 삭제할 수도 있다. GPU 노드에는 테인트를 붙여 CPU 위주의 작업이 들어오지 못하게 하고, GPU 네 개 가운데 두 개만 쓰고도 CPU가 바닥나지 않도록 GPU 파드의 CPU requests도 정직하게 설정한다.
+상태 없는 CPU 서버군에서는 기본적인 점수 계산 원칙, 즉 파드를 분산하고 노드 부하를 고르게 유지하는 전략이 건전하다. 이웃 워크로드 간섭을 완화하고 노드 손실도 자연스럽게 견딘다. 하지만 GPU 서버군에서는 두 가지 방식으로 조용히 비용이 커진다. 첫째는 \textbf{단편화}다. 1-GPU 파드를 여러 노드에 흩으면 모든 노드가 일부만 사용된다. 나중에 다중 GPU 파드가 와도 여유 GPU가 충분한 단일 노드를 찾지 못해, 전체 여유 용량은 많은데도 Pending이 된다. 둘째는 \textbf{유휴 고립}이다. GPU가 없는 파드가 CPU나 메모리를 차지한 GPU 노드에서는 GPU가 비어 있고 비용도 내고 있지만 사용할 수 없다. 해결책은 코드가 아니라 정책이다. GPU 노드에 \textbf{빈 패킹} 점수(스케줄러의 MostAllocated 전략)를 적용해 사용 중인 노드는 채우고 빈 노드는 계속 비워 둔다. 그러면 12주 차의 클러스터 오토스케일러(cluster autoscaler)가 완전히 유휴 상태인 노드를 삭제할 수도 있다. GPU 노드에는 테인트를 붙여 CPU 위주의 작업이 들어오지 못하게 하고, GPU 네 개 가운데 두 개만 쓰고도 CPU가 바닥나지 않도록 GPU 파드의 CPU requests도 실제로 필요한 만큼 설정한다.
 
 \begin{calloutbox}{tbbamber}{tbbamberfill}
 {\normalsize\bfseries\color{tbbamberdark}계산 예시 — 단편화의 비용}\par\vspace{3pt}
-클러스터에 A100 4개를 갖춘 노드 4대가 있다(온디맨드 ≈ \textbf{\$3/GPU-hour}, 대표값). GPU 1개를 쓰는 서빙 파드 16개가 들어오면 분산 점수 전략을 쓰는 스케줄러가 노드마다 4개씩 배치한다. 깔끔하게 전부 사용되어 \textit{아직은} 낭비가 없다. 밤이 되어 트래픽이 줄고 플릿이 파드 6개로 축소된다. 분산 전략은 노드마다 파드를 약 1–2개씩 유지한다. \textbf{노드 4대가 계속 실행되고 유휴 GPU 10개에도 계속 비용이 청구된다.} ≈ 10 × \$3 × 24 ≈ \textbf{\$720/day의 유휴 비용}이며, 모든 노드에 파드가 있어 오토스케일러는 아무것도 삭제할 수 없다.
+클러스터에 A100 4개를 갖춘 노드 4대가 있다(온디맨드 ≈ \textbf{\$3/GPU-hour}, 대표값). GPU 1개를 쓰는 서빙 파드 16개가 들어오면 분산 점수 전략을 쓰는 스케줄러가 노드마다 4개씩 배치한다. 깔끔하게 전부 사용되어 \textit{아직은} 낭비가 없다. 밤이 되어 트래픽이 줄고 서버군이 파드 6개로 축소된다. 분산 전략은 노드마다 파드를 약 1–2개씩 유지한다. \textbf{노드 4대가 계속 실행되고 유휴 GPU 10개에도 계속 비용이 청구된다.} ≈ 10 × \$3 × 24 ≈ \textbf{\$720/day의 유휴 비용}이며, 모든 노드에 파드가 있어 오토스케일러는 아무것도 삭제할 수 없다.
 
 같은 클러스터를 빈 패킹하면 파드 6개가 노드 1.5대를 채운다. 노드 2대만 실행하고 나머지 2대는 비운 뒤 삭제할 수 있어 유휴 비용이 ≈ \$144/day로 줄어든다. 새벽에 GPU 4개를 쓰는 학습 작업이 들어오면 패킹 배치에는 통째로 비어 있는 노드 하나를 줄 수 있다. 반면 분산 배치는 GPU 10개가 조각난 채 비어 있는데도 \textbf{Pending — 노드 4대 가운데 여유 GPU 4개를 갖춘 노드는 0대}라고 보고한다. 단편화는 비용이 붙은 Pending이다.
 \end{calloutbox}
@@ -492,14 +496,14 @@ Allocated resources:
 {\normalsize\bfseries\color{tbbpurple}생각해 보기}\par\vspace{3pt}
 \begin{tbbitemize}
   \item GPU requests는 limits와 같아야 하지만 CPU requests와 limits는 달라도 되는 이유를 제3장의 컨트롤러 목록을 근거로 정확히 설명하자.
-  \item 로그 수집용 DaemonSet(노드마다 파드 하나)이 CPU 2개를 요청한다. 터미널 기록 5-8의 48-CPU GPU 노드에서는 별문제 없어 보인다. 노드 20개로 구성된 GPU 플릿에서 vCPU-hour당 \textasciitilde{}\$0.05를 기준으로 연간 비용을 계산한 뒤 더 저렴한 설계를 제시하자.
+  \item 로그 수집용 DaemonSet(노드마다 파드 하나)이 CPU 2개를 요청한다. 터미널 기록 5-8의 48-CPU GPU 노드에서는 별문제 없어 보인다. 노드 20개로 구성된 GPU 서버군에서 vCPU-hour당 \textasciitilde{}\$0.05를 기준으로 연간 비용을 계산한 뒤 더 저렴한 설계를 제시하자.
   \item 모델 A(지연 시간에 민감하고 T4에 맞게 양자화됨)와 모델 B(배치 작업, A100-80GB 필요), 범용 CPU 마이크로서비스를 서빙하는 클러스터의 레이블, 테인트, 톨러레이션을 설계하자. 어디에는 중복 배치를 허용하고 어디에는 금지할 것인가?
 \end{tbbitemize}
 \end{calloutbox}
 
-\section{죽어 가는 파드 현장 안내서}
+\section{증상으로 찾는 파드 장애의 원인}
 
-단일 머신에서 "고장 났다"는 말이 나오면 살펴볼 곳도 하나다. 클러스터에서는 같은 소식이 파드 \textbf{상태}, 객체 \textbf{이벤트}, 컨테이너 \textbf{로그}, Service \textbf{엔드포인트}처럼 서로 다른 여러 표면으로 들어온다. 어떤 질문에 어느 표면이 답하는지 아는 것이 기술이다. 다행히 실제로는 \textbf{여섯 가지 상태가 거의 모든 서빙 사고를 포괄하며}(그림 5-7), 각각 뚜렷한 징후와 가장 먼저 실행할 표준 명령이 있다. 이 절에서는 가장 교훈적인 사례 하나를 처음부터 끝까지 재현하고, 나머지 다섯 가지를 정리한다. 전체에 걸쳐 한 가지 반사 행동을 익히자. \textbf{먼저 kubectl describe pod를 실행한다. 보통 Events 절에 판결문이 있다.}
+클러스터에서 “서비스가 안 된다”는 연락을 받으면 어느 기록부터 열어야 할까? 파드 \textbf{상태}, 객체 \textbf{이벤트}, 컨테이너 \textbf{로그}, Service \textbf{엔드포인트}에서 각각 알 수 있는 내용이 다르다. 그림 5-7에는 서빙 중 흔히 만나는 \textbf{여섯 가지 상태}와 상태별 증상, 처음 실행할 명령을 모았다. 하나는 처음부터 끝까지 함께 재현하고 나머지 다섯 가지는 사례별로 짚어 보자. 첫 동작은 미리 익혀 두면 좋다. \textbf{kubectl describe pod를 실행하고 Events부터 읽는다.} 대개 거기에 실마리가 있다.
 
 \begin{tbbfigure}
   \adjustbox{max width=0.94\linewidth,max totalheight=0.46\textheight}{\includegraphics{figures/fig5-7_fieldguide.png}}\\[3pt]
@@ -532,9 +536,9 @@ INFO  loading weights shard 6/8 ...
 INFO  loading weights shard 7/8 ...
 \end{Verbatim}
 \end{terminalbox}
-\figcaption{터미널 기록 5-9  포렌식 연결 고리. CrashLoopBackOff → describe가 활성 상태 프로브를 처형자로 지목 → logs --previous에는 느리게 로딩했을 뿐인 프로세스가 보인다. 잘못을 저지른 것은 아무것도 없으므로 어디에도 오류는 나타나지 않는다.}
+\figcaption{터미널 기록 5-9  포렌식 연결 고리. CrashLoopBackOff → describe에서 활성 상태 프로브로 인한 종료를 확인 → logs --previous에는 느리게 로딩했을 뿐인 프로세스가 보인다. 잘못을 저지른 것은 아무것도 없으므로 어디에도 오류는 나타나지 않는다.}
 
-제3장에서 OOM 연결 고리를 분석한 방식으로 읽어 보자. \textbf{상태}는 컨테이너가 계속 죽는다고 말한다. \code{CrashLoopBackOff}는 원인이 아니라 재시작 사이의 대기 시간을 두 배씩 늘리는 재시작 \textit{정책}이다. \textbf{이벤트}는 처형자를 지목한다. 단일 스레드로 가중치를 읽느라 서버가 답할 수 없을 때 응답을 요구한 활성 상태 프로브를 대신해 kubelet이 죽였다. \textbf{이전 로그}는 비행 기록 장치다. 일반 \code{logs}는 막 재시작한 \textit{현재} 시도를 보여 주지만 이전 로그는 오류 하나 없이 로딩 도중에 끝난다. 종료하고, 다시 로딩하고, 다시 종료한다. 재시작할 때마다 전체 로딩 비용을 다시 치르고(제3장의 재시작 루프 경제학), 파드는 한 번도 Ready가 되지 못했다. 해결책은 최악의 로딩 시간을 포괄하는 예산을 둔 startupProbe, 즉 터미널 기록 5-3의 구절이다. 적용하면 같은 이미지가 조용히 90초를 보낸 뒤 Ready가 된다. 이 사고보다 오래 남을 일반 교훈이 있다. \textbf{Kubernetes에서는 플랫폼 자체도 실패 원인 가운데 하나다.} 프로브, 상한, 퇴거는 정상 프로세스를 죽일 수 있으며, 증거는 애플리케이션 로그가 아니라 이벤트에 남는다.
+제3장에서 OOM 연결 고리를 분석한 방식으로 읽어 보자. \textbf{상태}는 컨테이너가 계속 죽는다고 말한다. \code{CrashLoopBackOff}는 원인이 아니라 재시작 사이의 대기 시간을 두 배씩 늘리는 재시작 \textit{정책}이다. \textbf{이벤트}는 무엇이 프로세스를 종료했는지 알려 준다. 단일 스레드로 가중치를 읽느라 서버가 답할 수 없을 때 응답을 요구한 활성 상태 프로브를 대신해 kubelet이 죽였다. \textbf{이전 로그}는 비행 기록 장치다. 일반 \code{logs}는 막 재시작한 \textit{현재} 시도를 보여 주지만 이전 로그는 오류 하나 없이 로딩 도중에 끝난다. 종료하고, 다시 로딩하고, 다시 종료한다. 재시작할 때마다 전체 로딩 비용을 다시 치르고(제3장의 재시작 루프 경제학), 파드는 한 번도 Ready가 되지 못했다. 해결책은 최악의 로딩 시간을 포괄하는 예산을 둔 startupProbe, 즉 터미널 기록 5-3의 구절이다. 적용하면 같은 이미지가 조용히 90초를 보낸 뒤 Ready가 된다. 이 사고보다 오래 남을 일반 교훈이 있다. \textbf{Kubernetes에서는 플랫폼 자체도 실패 원인 가운데 하나다.} 프로브, 상한, 퇴거는 정상 프로세스를 죽일 수 있으며, 증거는 애플리케이션 로그가 아니라 이벤트에 남는다.
 
 \subsection*{Pending: 스케줄러가 풀이 과정을 보여 준다}
 
@@ -559,7 +563,7 @@ Pending은 시스템에서 가장 충실하게 스스로 설명하는 상태다.
 \begin{tbbitemize}
   \item \textbf{ImagePullBackOff} — 노드가 이미지를 가져올 수 없다. 태그가 틀렸거나, 비공개 레지스트리에 필요한 \code{imagePullSecrets}가 없거나, 노드에서 레지스트리에 접근할 수 없는 경우다. 제4장의 레지스트리 배관 문제이며, \code{describe} events에 원본 pull 오류가 들어 있다. (미묘한 서빙 변형도 있다. 태그는 존재하지만 이미지 크기가 8 GB이고 노드 디스크가 가득 찬 경우로, 이벤트가 그대로 알려 준다.)
   \item \textbf{OOMKilled / exit 137} — 제3장 §3.6의 상황을 플랫폼이 다시 보여 준다. \code{describe}에는 \code{Last State: Terminated, Reason: OOMKilled, Exit Code: 137}이 나타난다. Kubernetes에는 한 가지 변형이 있다. \code{restartPolicy}가 \textit{같은} limit로 컨테이너를 되살리므로, 너무 작은 limit는 매번 모델 로딩 콜드 스타트 비용을 치르는 충돌 루프가 된다. §3.6의 단순 정책에 관성이 붙은 셈이다. 해결 방법은 똑같다. 측정한 최댓값에 맞게 크기를 조정하거나 변동 부분을 제한해야 하며, try/except로 처리해서는 안 된다.
-  \item \textbf{Evicted} — \textit{노드}의 자원이 부족해졌다(표 5-2). 상태는 \code{Evicted}, 메시지는 "노드의 메모리 리소스가 부족함"으로 나온다. 파드는 잘못이 없었을 수도 있으며, 희생 대상은 QoS가 결정했다. 퇴거가 반복되면 노드 어딘가의 requests가 정직하지 않다는 뜻이다. 네임스페이스를 감사하고 서빙 파드를 Guaranteed로 옮긴다.
+  \item \textbf{Evicted} — \textit{노드}의 자원이 부족해졌다(표 5-2). 상태는 \code{Evicted}, 메시지는 "노드의 메모리 리소스가 부족함"으로 나온다. 파드는 잘못이 없었을 수도 있으며, 희생 대상은 QoS가 결정했다. 퇴거가 반복되면 노드 어딘가의 requests가 실제 사용량과 다르다는 뜻이다. 네임스페이스를 감사하고 서빙 파드를 Guaranteed로 옮긴다.
   \item \textbf{실행 중이지만 라우팅되지 않음} — 조용한 상태이자, 이 목록에서 유일하게 어디에도 오류가 나타나지 않는 상태다. 파드가 실행되고 활성 상태 검사를 통과하지만 준비 상태가 끝내 true가 되지 않거나 레이블이 Service 셀렉터와 일치하지 않는다. 따라서 \textbf{엔드포인트 목록이 비고} Service는 트래픽을 보낼 곳이 없다. 클라이언트에는 연결 오류가 발생하지만 모든 파드 대시보드는 초록색이다. 이를 드러내는 명령은 \code{kubectl get endpoints model-svc} 하나다. 저자의 경험상 이 명령을 확인하는 반사 행동이 이 장에서 얻을 수 있는 가장 가치 있는 습관이다.
 \end{tbbitemize}
 
@@ -579,34 +583,34 @@ Pending은 시스템에서 가장 충실하게 스스로 설명하는 상태다.
 \begin{calloutbox}{tbbpurple}{tbbpurplefill}
 {\normalsize\bfseries\color{tbbpurple}생각해 보기}\par\vspace{3pt}
 \begin{tbbitemize}
-  \item 컨테이너가 CrashLoopBackOff를 보이고 logs --previous는 오류 없이 끝나며 exit code는 137이다. 서로 다른 두 처형자가 137을 만든다(제3장의 SIGKILL 계산). 둘을 말하고, 구별할 수 있는 정확한 describe 필드를 제시하자.
+  \item 컨테이너가 CrashLoopBackOff를 보이고 logs --previous는 오류 없이 끝나며 exit code는 137이다. 서로 다른 두 종료 주체가 137을 만든다(제3장의 SIGKILL 계산). 둘을 말하고, 구별할 수 있는 정확한 describe 필드를 제시하자.
   \item 팀의 readinessProbe가 데이터베이스 의존성을 검사한다. 데이터베이스가 30초 동안 잠깐 멈추자 모든 파드가 동시에 준비되지 않은 상태가 되고 → 엔드포인트가 비며 → 캐시된 응답을 제공할 수 있었던 서비스까지 완전히 중단된다. 준비 상태 프로브(readiness probe)에서 의존성을 검사하는 방식의 장단점을 논하고 절충안을 제안하자.
   \item "모델 서버는 정상이고 Service 셀렉터가 잘못되었다"는 사실을 1분 안에 증명할 명령 순서를 설계하자. (port-forward와 get endpoints가 유용하다.)
 \end{tbbitemize}
 \end{calloutbox}
 
-\section{실습: 모델 서버 오케스트레이션}
+\section{실습 · 모델 서버 오케스트레이션}
 
-이번 주 실습에서는 제4장의 이미지를 \code{docker run}에서 관리형 플릿으로 승격한 뒤, §5.6의 모든 방식으로 의도적으로 망가뜨린다. 모든 과정은 노트북에서 실행된다. \code{minikube start --cpus 4 --memory 8g}를 사용하며 kind도 똑같이 동작한다. 이미지는 강의 레지스트리에서 제공하고, 공개 대체 태그는 유인물에 있다. 이번 주에는 클라우드 비용이 필요 없다. §5.5의 GPU 터미널 기록은 시연 전용이며, 이미 크레딧이 있는 팀을 위해 관리형 클러스터에서 재현하는 선택 부록을 제공한다. \code{kubectl create namespace ml}로 만든 네임스페이스 안에서 작업한다.
+이번 주 실습에서는 제4장의 이미지를 \code{docker run}에서 관리형 서버군으로 승격한 뒤, §5.6의 모든 방식으로 의도적으로 망가뜨린다. 모든 과정은 노트북에서 실행된다. \code{minikube start --cpus 4 --memory 8g}를 사용하며 kind도 똑같이 동작한다. 이미지는 강의 레지스트리에서 제공하고, 공개 대체 태그는 유인물에 있다. 이번 주에는 클라우드 비용이 필요 없다. §5.5의 GPU 터미널 기록은 시연 전용이며, 이미 크레딧이 있는 팀을 위해 관리형 클러스터에서 재현하는 선택 부록을 제공한다. \code{kubectl create namespace ml}로 만든 네임스페이스 안에서 작업한다.
 
-\subsection*{파트 A — 배포하고 노출한 뒤 루프를 신뢰하기}
+\subsection*{A부 — 서비스를 배포하고 외부에 공개한 뒤 자동 복구 확인하기}
 
-터미널 기록 5-3의 Deployment와 터미널 기록 5-6의 Service를 적용한다(minikube에서는 NodePort 유형). \code{get pods -o wide}로 플릿을 확인한 뒤, \textbf{자기 플릿에서 터미널 기록 5-1의 실험을 다시 실행}한다. curl 루프 도중 파드를 삭제하고 조정 과정을 기록한다. 이어서 터미널에서 Service에 초당 요청 하나를 보내는 curl 루프를 실행한 채 \code{:v8}로 롤링 업데이트한다. 제출물의 핵심 장면은 전체 롤아웃 동안의 루프 출력이다. 준비 상태가 속도를 제어하고 제3장의 SIGTERM 핸들러가 기존 파드의 처리 중인 요청을 비우므로 \textbf{실패한 요청은 0개}여야 한다. (그런 다음 의도적으로 망가뜨린다. readinessProbe를 제거하고 \code{:v9-slow}로 롤아웃해 같은 curl 루프에서 오류가 나는 모습을 확인한다. 준비 상태의 효과를 증명하는 음성 대조군이다.)
+터미널 기록 5-3의 Deployment와 터미널 기록 5-6의 Service를 적용한다(minikube에서는 NodePort 유형). \code{get pods -o wide}로 서버군을 확인한 뒤, \textbf{자기 서버군에서 터미널 기록 5-1의 실험을 다시 실행}한다. curl 루프 도중 파드를 삭제하고 조정 과정을 기록한다. 이어서 터미널에서 Service에 초당 요청 하나를 보내는 curl 루프를 실행한 채 \code{:v8}로 롤링 업데이트한다. 제출물의 핵심 장면은 전체 롤아웃 동안의 루프 출력이다. 준비 상태가 속도를 제어하고 제3장의 SIGTERM 핸들러가 기존 파드의 처리 중인 요청을 비우므로 \textbf{실패한 요청은 0개}여야 한다. (그런 다음 의도적으로 망가뜨린다. readinessProbe를 제거하고 \code{:v9-slow}로 롤아웃해 같은 curl 루프에서 오류가 나는 모습을 확인한다. 준비 상태의 효과를 증명하는 음성 대조군이다.)
 
-\subsection*{파트 B — 직접 검증하는 변환 관계}
+\subsection*{B부 — 자원 설정이 어떻게 반영되는지 확인하기}
 
-터미널 기록 5-7을 직접 재현한다. \code{minikube ssh}로 접속해 \code{/\allowbreak sys/\allowbreak fs/\allowbreak cgroup/\allowbreak kubepods.slice/\allowbreak } 아래의 cgroup 트리를 따라가고, YAML의 숫자가 \code{memory.max}와 \code{cpu.max}에 들어 있는 모습을 캡처한다. 자기 터미널에서 이 장의 핵심을 증명하는 것이다. 그런 다음 OOM을 재현한다. 표준 모델에 \code{limits.memory: 256Mi}를 설정해 적용하고, Kubernetes식 증거 연결 고리를 수집한다. \code{describe}의 \code{OOMKilled /\allowbreak  137}과 함께 충돌 루프가 매번 모델 로딩 콜드 스타트 비용을 치르면서 재시작 횟수가 증가하는 모습을 담는다. 정직한 상한으로 복구하고, §3.6의 어휘를 사용해 전후 차이를 보고서에 기록한다.
+터미널 기록 5-7을 직접 재현한다. \code{minikube ssh}로 접속해 \code{/\allowbreak sys/\allowbreak fs/\allowbreak cgroup/\allowbreak kubepods.slice/\allowbreak } 아래의 cgroup 트리를 따라가고, YAML의 숫자가 \code{memory.max}와 \code{cpu.max}에 들어 있는 모습을 캡처한다. 자기 터미널에서 이 장의 핵심을 증명하는 것이다. 그런 다음 OOM을 재현한다. 표준 모델에 \code{limits.memory: 256Mi}를 설정해 적용하고, Kubernetes식 증거 연결 고리를 수집한다. \code{describe}의 \code{OOMKilled /\allowbreak  137}과 함께 충돌 루프가 매번 모델 로딩 콜드 스타트 비용을 치르면서 재시작 횟수가 증가하는 모습을 담는다. 실제 부하에 맞는 한도로 되돌리고, §3.6의 어휘를 사용해 전후 차이를 보고서에 기록한다.
 
-\subsection*{파트 C — 망가뜨리고, 진단하고, 고치기}
+\subsection*{C부 — 장애를 재현하고 원인을 찾아 고치기}
 
 세 가지 사고를 재현한다. 각 사고는 해결책을 적용하고 어떤 절에서 이를 예측했는지 한 문장으로 밝히며 끝낸다. \textbf{(1) Pending:} GPU가 없는 minikube에서 \code{nvidia.com/\allowbreak gpu: 1}을 요청한다. FailedScheduling 이벤트를 캡처하고 필터 보고서를 소리 내어 읽은 뒤(§5.5), 요청을 제거해 고친다. \textbf{(2) 프로브 사고:} 환경 변수 \code{SLOW\_LOAD=90}을 설정해 실습 이미지가 느린 모델 로딩을 모의하게 하고, startupProbe를 삭제하며, 활성 상태 프로브를 \code{periodSeconds: 5, failureThreshold: 2}로 강화한다. 터미널 기록 5-9의 전체 포렌식 연결 고리인 상태, 이벤트, \code{logs --previous}를 재현한다. startupProbe 설정으로 고치고 같은 이미지가 Ready가 되는 모습을 보여 준다. \textbf{(3) 조용한 실패:} 준비 상태 경로를 서버가 제공하지 않는 오타 \code{/\allowbreak readyz}로 바꾼다. Running 상태 파드, 정상인 활성 상태 검사, 비어 있는 \code{get endpoints}, 실패하는 클라이언트 curl 요청을 관찰한다. 수정한 뒤 엔드포인트가 다시 채워지는 모습을 확인한다.
 
 \begin{calloutbox}{tbbpurple}{tbbpurplefill}
 {\normalsize\bfseries\color{tbbpurple}실습 체크리스트}\par\vspace{3pt}
 \begin{tbbitemize}
-  \item 파트 A 결과물: 플릿의 \code{get pods -o wide} · 삭제와 조정 캡처 · 롤링 업데이트 내내 중단 없이 실행된 curl 루프 · 음성 대조군(준비 상태 검사 없음 → 오류).
-  \item 파트 B 결과물: YAML과 일치하는 노드 쪽 \code{memory.max}와 \code{cpu.max} · 재시작 횟수를 포함한 OOMKilled describe 블록 · 복원한 설정.
-  \item 파트 C 결과물: FailedScheduling 필터 보고서 · 터미널 기록 5-9 재현(이벤트 + logs --previous)과 수정 후 Ready 상태 · 비어 있는 엔드포인트라는 징후와 다시 채워진 모습.
+  \item A부 결과물: 서버군의 \code{get pods -o wide} · 삭제와 조정 캡처 · 롤링 업데이트 내내 중단 없이 실행된 curl 루프 · 음성 대조군(준비 상태 검사 없음 → 오류).
+  \item B부 결과물: YAML과 일치하는 노드 쪽 \code{memory.max}와 \code{cpu.max} · 재시작 횟수를 포함한 OOMKilled describe 블록 · 복원한 설정.
+  \item C부 결과물: FailedScheduling 필터 보고서 · 터미널 기록 5-9 재현(이벤트 + logs --previous)과 수정 후 Ready 상태 · 비어 있는 엔드포인트라는 징후와 다시 채워진 모습.
   \item 보고서: 한 페이지, 관찰 세 가지, 각각 관련 절을 명시(예: "활성 상태 프로브 종료는 애플리케이션 로그를 남기지 않았다 — §5.6의 실패 원인으로서의 플랫폼").
   \item 정리: \code{kubectl delete namespace ml}; \code{minikube stop}. (이번 주에는 클라우드 비용이 없지만 습관은 유지한다.)
 \end{tbbitemize}
@@ -617,20 +621,20 @@ Pending은 시스템에서 가장 충실하게 스스로 설명하는 상태다.
 \begin{calloutbox}{tbbpurple}{tbbpurplefill}
 {\normalsize\bfseries\color{tbbpurple}생각해 보기}\par\vspace{3pt}
 \begin{tbbitemize}
-  \item 파트 A의 롤링 업데이트 동안 curl 루프는 한 번도 실패하지 않았다. 준비 상태 관문과 엔드포인트 갱신부터 제3장의 SIGTERM 핸들러까지 협력해야 했던 모든 메커니즘을 열거하고, 어느 하나를 제거했을 때 가장 손쉽게 보장이 깨지는지 찾자.
+  \item A부의 롤링 업데이트 동안 curl 루프는 한 번도 실패하지 않았다. 준비 상태 관문과 엔드포인트 갱신부터 제3장의 SIGTERM 핸들러까지 협력해야 했던 모든 메커니즘을 열거하고, 어느 하나를 제거했을 때 가장 손쉽게 보장이 깨지는지 찾자.
   \item minikube는 노드가 하나다. 실제 노드 다섯 개 클러스터라면 달라질 실습 동작 세 가지와, 단일 노드 클러스터에서는 제대로 재현할 수 없는 §5.6의 상태 하나를 말해 보자.
 \end{tbbitemize}
 \end{calloutbox}
 
 \namedsection{요약}{열 가지로 정리한 이 장}
 
-\qitem{1}{\textbf{Kubernetes는 조정 루프다.} 원하는 상태는 etcd에 있고, 컨트롤러는 영원히 관찰하고 차이를 찾고 동작한다. 명사를 선언하면 동사가 자연스럽게 나타난다. 삭제된 파드는 누군가 처리할 이벤트가 아니라 편차이며, 편차는 교정된다.}
+\qitem{1}{\textbf{Kubernetes는 제어 루프를 돌려 원하는 상태를 유지한다.} 원하는 상태는 etcd에 저장된다. 컨트롤러는 실제 상태를 관찰하다가 차이를 발견하면 그 차이를 줄인다. 레플리카 세 개를 선언했다면 파드 하나가 사라져도 운영자가 다시 띄울 필요가 없다. 컨트롤러가 부족한 한 개를 채운다.}
 
 \qitem{2}{\textbf{선언형 불변 조건은 시간이 지나도 효력을 잃지 않으므로 명령형 지시보다 강하다.} 노드 장애, 실수로 누른 삭제, 배포는 루프의 관점에서 모두 같다. 오토스케일링(12주 차)과 CI/CD(13주 차)는 원하는 상태를 작성하는 주체가 하나씩 더 늘어나는 것뿐이다.}
 
-\qitem{3}{\textbf{구조는 자기주장이 있는 데이터베이스다.} API 서버(유일한 출입구), etcd(유일한 상태), 스케줄러(중매자), 컨트롤러 매니저(루프), kubelet(손발), kube-proxy(NAT)로 구성된다. 구성 요소끼리는 직접 호출하지 않고 모든 통신은 API 서버를 감시하는 방식으로 이루어진다. 그래서 어느 한 구성 요소가 죽어도 시스템 전체가 중단되지 않는다.}
+\qitem{3}{\textbf{구성 요소는 API 서버를 통해 클러스터 상태를 공유한다.} API 서버는 상태를 읽고 쓰는 창구이고 etcd는 그 상태를 보관한다. 스케줄러는 노드를 고르고, 컨트롤러 매니저는 제어 루프를 돌리며, kubelet은 노드에서 파드를 관리하고 kube-proxy는 NAT를 담당한다. 각 구성 요소가 상태 변화를 독립적으로 감시하므로 하나가 잠시 멈춰도 클러스터 전체가 곧바로 멈추지는 않는다.}
 
-\qitem{4}{\textbf{Kubernetes라는 이름의 무언가가 컨테이너를 실행하는 것이 아니다.} 연결 고리는 apply → 객체 생성 → 스케줄러 바인딩 → kubelet → CRI → containerd → runc → 제3장의 네임스페이스와 cgroup이다. 마지막에 memory.max를 작성하는 대필자는 kubelet이다.}
+\qitem{4}{\textbf{apply 명령에서 컨테이너 실행까지 여러 구성 요소가 차례로 일한다.} 객체가 생기면 스케줄러가 노드를 정하고 kubelet은 CRI를 통해 containerd에 실행을 요청한다. runc가 제3장에서 배운 네임스페이스와 cgroup을 설정한다. 파드에 지정한 메모리 한도도 kubelet에서 이 경로를 거쳐 memory.max에 기록된다.}
 
 \qitem{5}{\textbf{파드는 스케줄링과 공유의 단위다.} 컨테이너는 pause 컨테이너의 NET 네임스페이스(하나의 IP, localhost로 연결된 사이드카)에 합류하고 볼륨을 공유하며, MNT와 PID는 각자 분리된다. 파드는 언젠가 사라지고 레이블로 주소를 지정하므로 IP를 직접 대상으로 삼아서는 안 된다. 이 모든 것이 가정하는 워크로드 형태는 \textbf{마이크로서비스}다. 서비스마다 기능 하나를 두고 코드 복잡성을 운영 복잡성과 맞바꾼다. 세 축은 이 절충 관계의 입문 키트이며, 마이크로서비스 하나 = Deployment 하나 + Service 하나다.}
 
@@ -638,9 +642,9 @@ Pending은 시스템에서 가장 충실하게 스스로 설명하는 상태다.
 
 \qitem{7}{\textbf{Deployment는 기계적인 방식으로 무중단 롤아웃을 만든다.} 템플릿 버전마다 ReplicaSet 하나를 두고, maxSurge/maxUnavailable로 속도를 조절하며, 준비 상태를 관문으로 사용하고, 롤백할 때는 이전 대상을 다시 가리킨다. Terminating 파드마다 제3장의 SIGTERM 과정이 되풀이된다. 처리 중인 요청을 비우는 일은 핸들러가 하고 Kubernetes는 그 작업을 스케줄링할 뿐이다.}
 
-\qitem{8}{\textbf{requests는 스케줄러의 산술 값이고 limits는 cgroup의 벽이다.} requests.cpu는 유연하고 작업 보존적인 cpu.weight의 바탕도 된다. limits는 cpu.max(버스트 스로틀링 — §3.3에서 만든 p99)와 memory.max(§3.6의 OOM 벽)가 된다. requests와 limits 사이의 간격은 의도적인 오버커밋이다. 가정이 틀리면 kubelet이 퇴거를 수행하며, 이는 Evicted 대 OOMKilled/137이라는 서로 다른 징후를 보이는 두 번째 처형자다. QoS 클래스(Guaranteed / Burstable / BestEffort)는 oom\_score\_adj를 설정하며, 서빙 파드는 Guaranteed로 실행한다.}
+\qitem{8}{\textbf{requests는 스케줄러의 산술 값이고 limits는 cgroup의 벽이다.} requests.cpu는 유연하고 작업 보존적인 cpu.weight의 바탕도 된다. limits는 cpu.max(버스트 스로틀링 — §3.3에서 만든 p99)와 memory.max(§3.6의 OOM 벽)가 된다. requests와 limits 사이의 간격은 의도적인 오버커밋이다. 가정이 틀리면 kubelet이 퇴거를 수행하며, 이는 Evicted 대 OOMKilled/137이라는 서로 다른 징후를 보이는 또 다른 종료 원인이다. QoS 클래스(Guaranteed / Burstable / BestEffort)는 oom\_score\_adj를 설정하며, 서빙 파드는 Guaranteed로 실행한다.}
 
-\qitem{9}{\textbf{GPU는 정수 단위 확장 리소스로 스케줄링된다. 일부만 요청할 수 없고 오버커밋도 없으며 requests = limits다. GPU 공유를 중재할 cgroup 컨트롤러가 없기 때문이다(제3장의 공백).} 테인트는 밀어내고 어피니티는 방향을 정하며 디바이스 플러그인은 리소스를 알리고 할당한다. GPU 플릿은 빈 패킹해야 한다. 단편화는 비용이 붙은 Pending이고 고립된 GPU는 유휴 상태로도 비용이 청구된다. 일부만 나누어 쓰는 방식은 제2장의 MIG/시간 분할에서 온다(12주 차).}
+\qitem{9}{\textbf{GPU는 정수 단위 확장 리소스로 스케줄링된다. 일부만 요청할 수 없고 오버커밋도 없으며 requests = limits다. GPU 공유를 중재할 cgroup 컨트롤러가 없기 때문이다(제3장의 공백).} 테인트는 밀어내고 어피니티는 방향을 정하며 디바이스 플러그인은 리소스를 알리고 할당한다. GPU 서버군은 빈 패킹해야 한다. 단편화는 비용이 붙은 Pending이고 고립된 GPU는 유휴 상태로도 비용이 청구된다. 일부만 나누어 쓰는 방식은 제2장의 MIG/시간 분할에서 온다(12주 차).}
 
 \qitem{10}{\textbf{여섯 가지 상태가 거의 모든 서빙 사고를 포괄한다.} Pending(필터 보고서 확인), ImagePullBackOff(제4장의 배관), CrashLoopBackOff(애플리케이션 충돌 또는 프로브 종료 — logs --previous), OOMKilled/137(제3장과 동일), Evicted(노드 압박), 실행 중이지만 라우팅되지 않음(빈 엔드포인트 — 조용한 실패)다. describe → 이벤트가 진단의 출입구이며 플랫폼 자체도 실패 원인 가운데 하나다.}
 
@@ -675,7 +679,7 @@ Pending은 시스템에서 가장 충실하게 스스로 설명하는 상태다.
   \item ④ limits는 GPU에만 영향을 준다.
 \end{tbboptions}
 
-\qitem{4}{파드가 Running이고 liveness도 통과하지만 클라이언트가 Service를 통해 연결 오류를 겪는다. 가장 먼저 확인할 가치가 큰 항목은?}
+\qitem{4}{파드가 Running이고 liveness도 통과하지만 클라이언트가 Service를 통해 연결 오류를 겪는다. 어느 항목부터 확인해야 하는가?}
 
 \begin{tbboptions}
   \item ① kubectl logs — 스택 추적을 찾는다.
@@ -710,7 +714,7 @@ Pending은 시스템에서 가장 충실하게 스스로 설명하는 상태다.
 
 \qitem{3}{모델 로딩에 최대 120초가 걸리는 서버에 적합한 프로브 설정(프로브 유형, 주기, failureThreshold)을 작성하고, 각 숫자의 근거를 한 구절씩 제시하라.}
 
-\qitem{4}{OOMKilled와 Evicted를 비교해 각각 발동 조건, 처형자, 한 줄짜리 징후를 제시하라.}
+\qitem{4}{OOMKilled와 Evicted를 비교해 각각 발동 조건, 종료 주체, 로그에서 확인할 단서 한 줄를 제시하라.}
 
 \subsection*{C. 논술형}
 
@@ -726,7 +730,7 @@ Pending은 시스템에서 가장 충실하게 스스로 설명하는 상태다.
 
 \qitem{1}{\textbf{③} 되살리는 것이 아니라 조정한다. ReplicaSet 조정 루프가 2 ≠ 3을 세고 새 파드(새 접미사, 새 IP, 경우에 따라 새 노드)를 만든다. ②는 파드 내부의 컨테이너 재시작과 파드 교체를 혼동했다. (§5.1)}
 
-\qitem{2}{\textbf{④} kubelet은 손발이자 대필자다. CRI를 통해 containerd/runc를 구동하고, 이들이 cgroup 파일을 작성한다. API 서버는 저장하고 스케줄러는 배치할 뿐, 어느 쪽도 노드를 건드리지 않는다. (§5.2, §5.4)}
+\qitem{2}{\textbf{④} 노드에서 실제 실행을 지시하는 구성 요소는 kubelet이다. CRI를 통해 containerd/runc를 구동하고, 이들이 cgroup 파일을 작성한다. API 서버는 저장하고 스케줄러는 배치할 뿐, 어느 쪽도 노드를 건드리지 않는다. (§5.2, §5.4)}
 
 \qitem{3}{\textbf{②} 이 장의 핵심 비대칭이다. requests는 계획용 숫자로 런타임에 강제되지 않으며 CPU 요청량은 cpu.weight의 바탕도 된다. limits는 매 밀리초 강제되는 제3장의 cgroup 벽이다. (§5.4)}
 
@@ -748,9 +752,9 @@ Pending은 시스템에서 가장 충실하게 스스로 설명하는 상태다.
 
 \subsection*{C. 논술형(채점 기준)}
 
-\qitem{1}{"limit를 설정하지 말라"는 쪽은 §3.3의 계산(30 ms 작업 → 0.2-CPU 상한에서 110–190 ms, p99 급증, 프로파일러에는 보이지 않음), cpu.weight가 자원을 낭비하지 않으면서 이미 경합의 공정성을 보장한다는 점, 유휴 여유분은 저렴한 보험이라는 점을 들어야 한다. 반대쪽은 플랫폼 규모의 폭주 방지와 비용 관리, 정직하지 않은 requests를 설정한 파드로부터 멀티테넌트 공정성을 지키는 문제, Guaranteed QoS가 limits를 요구하고 오버커밋 노드에서 Guaranteed의 OOM 보호가 중요하다는 점, 정적 CPU 매니저 고정에 정수 requests = limits가 필요하다는 점을 들어야 한다. 좋은 답은 이 긴장을 다룬 뒤 입장을 정한다. 예를 들어 측정한 최대 CPU보다 넉넉하게 requests = limits(Guaranteed)를 설정하거나, CPU limit 없이 메모리만 Guaranteed인 Burstable과 PriorityClass를 사용하고 각각의 절충 관계를 밝힌다. (§5.4)}
+\qitem{1}{"limit를 설정하지 말라"는 쪽은 §3.3의 계산(30 ms 작업 → 0.2-CPU 상한에서 110–190 ms, p99 급증, 프로파일러에는 보이지 않음), cpu.weight가 자원을 낭비하지 않으면서 이미 경합의 공정성을 보장한다는 점, 유휴 여유분은 저렴한 보험이라는 점을 들어야 한다. 반대쪽은 플랫폼 규모의 폭주 방지와 비용 관리, 사용량과 맞지 않는 requests를 설정한 파드로부터 멀티테넌트 공정성을 지키는 문제, Guaranteed QoS가 limits를 요구하고 오버커밋 노드에서 Guaranteed의 OOM 보호가 중요하다는 점, 정적 CPU 매니저 고정에 정수 requests = limits가 필요하다는 점을 들어야 한다. 좋은 답은 이 긴장을 다룬 뒤 입장을 정한다. 예를 들어 측정한 최대 CPU보다 넉넉하게 requests = limits(Guaranteed)를 설정하거나, CPU limit 없이 메모리만 Guaranteed인 Burstable과 PriorityClass를 사용하고 각각의 절충 관계를 밝힌다. (§5.4)}
 
-\qitem{2}{다음 요소를 확인한다. gpu=t4/a100 레이블이 붙은 세 노드 풀(t4-serving, a100-batch, cpu-general), 일반 CPU 작업이 들어오지 않도록 두 GPU 노드 풀에 적용한 테인트(§5.5), 톨러레이션 + gpu=t4 어피니티와 Guaranteed QoS를 적용한 모델 A 파드, 낮은 PriorityClass로 a100 노드 풀을 허용하고 CPU limits는 두지 않은 배치 작업 B, 축소와 다중 GPU 여유 공간을 위한 GPU 노드 풀의 빈 패킹(MostAllocated) 점수, 유휴 고립을 피하도록 GPU 파드에 설정한 정직한 CPU requests다. 비용 시나리오는 단편화로 인한 강제 노드 추가, CPU를 많이 쓰는 DaemonSet 뒤에 고립된 GPU, 배치 작업이 지연 시간에 민감한 파드를 선점하는 문제(우선순위 + 테인트로 방지)다. 12주 차에는 오토스케일러가 빈 패킹으로 비워진 노드를 삭제하고 배치 노드 풀을 0까지 축소한다. (§5.4–5.5)}
+\qitem{2}{다음 요소를 확인한다. gpu=t4/a100 레이블이 붙은 세 노드 풀(t4-serving, a100-batch, cpu-general), 일반 CPU 작업이 들어오지 않도록 두 GPU 노드 풀에 적용한 테인트(§5.5), 톨러레이션 + gpu=t4 어피니티와 Guaranteed QoS를 적용한 모델 A 파드, 낮은 PriorityClass로 a100 노드 풀을 허용하고 CPU limits는 두지 않은 배치 작업 B, 축소와 다중 GPU 여유 공간을 위한 GPU 노드 풀의 빈 패킹(MostAllocated) 점수, 유휴 고립을 피하도록 GPU 파드에 설정한 실제 사용량에 맞는 CPU requests다. 비용 시나리오는 단편화로 인한 강제 노드 추가, CPU를 많이 쓰는 DaemonSet 뒤에 고립된 GPU, 배치 작업이 지연 시간에 민감한 파드를 선점하는 문제(우선순위 + 테인트로 방지)다. 12주 차에는 오토스케일러가 빈 패킹으로 비워진 노드를 삭제하고 배치 노드 풀을 0까지 축소한다. (§5.4–5.5)}
 
 \qitem{3}{좋은 답은 먼저 전제의 근거를 인정한다. 90 s마다 자가 복구하는 충돌 루프의 모델 서버는 매번 콜드 스타트 지연 시간을 치르면서도 너무 작은 limit를 몇 주 동안 숨길 수 있고(§3.6의 관성), 터미널 기록 5-9의 사고는 애플리케이션 로그 증거를 전혀 남기지 않는다. 그런 다음 반론한다. 수렴이 새벽 3시의 장애를 견디게 하며, 루프는 증거를 숨기기보다 재시작 횟수, 이벤트, Last State, memory.events에 \textit{국소화}한다. 애플리케이션이 아니라 플랫폼의 표면을 보면 된다. 성숙한 운영(14주 차)은 재시작 횟수, oom\_kill 카운터, 비어 있는 엔드포인트, 멈춘 롤아웃에 경보를 건다. 즉 가용성뿐 아니라 편차 교정의 \textit{빈도}에 경보를 건다. 관측 가능성 없는 조정은 사고 억제지만, 관측 가능성과 결합하면 진단 시간을 벌어 주는 사고 \textit{완충}이라는 결론을 높이 평가한다. (§5.1, §5.6)}
 
@@ -774,5 +778,5 @@ Pending은 시스템에서 가장 충실하게 스스로 설명하는 상태다.
 
 \begin{calloutbox}{tbbblue}{tbbbluefill}
 {\normalsize\bfseries\color{tbbblue}다음 장 — 제6장: 스토리지와 네트워킹}\par\vspace{3pt}
-이제 모델 서버는 안정적인 이름을 가진 플릿으로 실행된다. 하지만 가중치는 여전히 이미지에 구워 넣은 상태이고(제3장에서 경고했다), Service도 여전히 클러스터 내부 배관에 머문다. 다음 주에는 서빙의 골격을 완성한다. \textbf{블록 스토리지(block storage)와 객체 스토리지}의 차이와 모델 가중치를 객체 스토어(object store)에 보관하는 이유, S3 호환 스토리지에 가중치와 데이터셋을 두고 시작할 때 로딩하며 이미지와 독립적으로 버전을 관리하는 \textbf{모델 저장소 패턴}(6주 차 실습에서 바로 이 경로를 만들고 13주 차 레지스트리 이야기의 바탕이 된다), Service 앞의 출입구인 \textbf{로드 밸런서와 API 게이트웨이}, 값비싼 GPU 플릿을 공개 인터넷에서 격리하는 데 필요한 \textbf{VPC와 보안 그룹(security group)} 기본 지식을 다룬다. 6주 차가 끝나면 이 책의 인프라 절반이 완성되고, 파트 2에서는 그 위에서 모델 서빙을 시작한다.
+이제 레플리카 여러 개에 같은 이름으로 접속할 수 있다. 아직 모델 가중치는 이미지에 들어 있고, Service에는 클러스터 안에서만 접근할 수 있다. 다음 장에서는 \textbf{블록 스토리지(block storage)와 객체 스토리지}를 비교해 가중치를 객체 스토어(object store)에 두는 이유를 살펴본다. S3 호환 스토리지에 가중치와 데이터셋을 보관하고 서버가 시작할 때 불러오면 이미지와 모델의 버전을 따로 관리할 수 있다. 이 \textbf{모델 저장소}를 6주 차 실습에서 만들고 13주 차에 레지스트리로 발전시킨다. 외부 요청은 Service 앞에 둔 \textbf{로드 밸런서와 API 게이트웨이}로 받아들이고, GPU 서버는 \textbf{VPC와 보안 그룹(security group)}으로 인터넷과 격리한다. 여기까지가 1부의 인프라다. 2부에서는 그 위에서 모델을 서빙한다.
 \end{calloutbox}

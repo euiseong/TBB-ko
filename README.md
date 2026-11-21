@@ -3,12 +3,12 @@
 [![Build PDF](https://github.com/euiseong/TBB-ko/actions/workflows/build-pdf.yml/badge.svg)](https://github.com/euiseong/TBB-ko/actions/workflows/build-pdf.yml)
 [![Latest PDF](https://img.shields.io/badge/download-latest%20PDF-2563EB)](https://github.com/euiseong/TBB-ko/releases/latest/download/main.pdf)
  
-**Download the book:** [latest PDF](https://github.com/euiseong/TBB-ko/releases/latest/download/main.pdf) — 이 책의 최신 버전을 다운로드 받을 수 있습니다.
+[최신 배포본 PDF 내려받기](https://github.com/euiseong/TBB-ko/releases/latest/download/main.pdf)
  
 
-AI 서비스 밑바탕의 원리 — 가상화, 컨테이너, 쿠버네티스, 서빙 엔진, 그리고 비용 —
-를 하나의 이야기로 엮은 오픈 교재입니다. 21시 04분에 무너진 데모에서 시작해,
-의도한 대로 정확히 월 900달러에 운영되는 서비스까지.
+21시 04분, 학생들이 공개한 데모에 사용자가 몰리자 응답이 끊겼습니다.
+이 책은 그 팀이 한 달 900달러의 예산을 지키면서 서비스를 운영하기까지의 과정을 따라갑니다.
+가상화와 컨테이너, 쿠버네티스와 서빙 엔진이 어떤 문제를 해결하고 각각 얼마의 비용이 드는지 배웁니다.
 
 이 저장소는 책의 **LaTeX 소스**를 담고 있으며, 장(chapter)마다 디렉터리 하나로
 구성돼 있습니다. (영어판은 [euiseong/TBB](https://github.com/euiseong/TBB)에 있습니다.)
@@ -21,29 +21,27 @@ AI 서비스 밑바탕의 원리 — 가상화, 컨테이너, 쿠버네티스, �
 
 **1부 — 인프라와 원리**
 
-1. 과정 개요: AI 서비스의 큰 그림
-2. 가상화 원리와 클라우드 컴퓨팅
-3. 컨테이너 내부
-4. Docker와 컨테이너 런타임 스택
-5. Kubernetes
-6. 스토리지와 네트워킹
+- 제1장 AI 서비스의 큰 그림
+- 제2장 가상화 원리와 클라우드 컴퓨팅
+- 제3장 컨테이너 내부
+- 제4장 Docker와 컨테이너 런타임 스택
+- 제5장 Kubernetes
+- 제6장 스토리지와 네트워킹
 
 **2부 — AI 서빙 시스템**
 
-7. 서빙 시스템 입문
-8. 모델 서빙 프레임워크
-9. 추론 최적화
-10. LLM 서빙
-11. 스케일링과 비용 최적화
+- 제7장 서빙 시스템 입문
+- 제9장 모델 서빙 프레임워크
+- 제10장 추론 최적화
+- 제11장 LLM 서빙
+- 제12장 스케일링과 비용 최적화
 
 **3부 — 운영**
 
-12. MLOps와 배포 자동화
-13. 모니터링과 신뢰성
+- 제13장 MLOps와 배포 자동화
+- 제14장 모니터링과 신뢰성
 
-*(제8장은 중간고사에 해당해 별도의 장이 없습니다. 그래서 장 번호가 7에서 9로
-건너뜁니다. 각 장 파일이 자기 번호를 직접 지정하므로 이 공백은 자체적으로
-처리됩니다.)*
+*8주 차에는 중간고사를 치르므로 제7장 다음은 제9장입니다.*
 
 ---
 

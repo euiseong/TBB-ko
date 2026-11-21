@@ -207,7 +207,7 @@
 
 % ---------------------------------------------------------------- figures
 \newenvironment{tbbfigure}{\par\medskip\begin{center}}{\end{center}\par\medskip}
-\newcommand{\figcaption}[1]{{\centering\small\color{tbbgray}#1\par}}
+\newcommand{\figcaption}[1]{\par{\small\justifying\color{tbbgray}\noindent#1\par}}
 
 % ---------------------------------------------------------------- callout box
 % left accent bar + light fill + thin border.
@@ -220,7 +220,7 @@
 
 % ---------------------------------------------------------------- terminal / code block
 \newtcolorbox{terminalbox}{%
-  enhanced, breakable, colback=tbbterminalbg, colframe=tbbtermframe,
+  enhanced, breakable, colback=tbbterminalbg, colframe=tbbtermframe, colupper=tbbtermfg,
   boxrule=0.4pt, arc=2pt,
   left=9pt, right=9pt, top=7pt, bottom=7pt,
   before skip=9pt, after skip=9pt}

@@ -37,7 +37,8 @@
 \include{frontmatter/preface}
 
 \cleardoublepage
-\pdfbookmark[0]{Contents}{toc}
+\renewcommand{\contentsname}{차례}
+\pdfbookmark[0]{\contentsname}{toc}
 {\hypersetup{linkcolor=tbbink}\tableofcontents}
 
 \mainmatter
